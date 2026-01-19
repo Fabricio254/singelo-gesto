@@ -474,44 +474,48 @@ def main():
         custo_box = TAMANHOS[tamanho]
         st.info(f"💰 Custo desta box: R$ {custo_box:,.2f} (será registrado automaticamente nas compras)")
         
-        with st.form("form_venda", clear_on_submit=True):
-            st.markdown("### Informações da Venda")
-            st.warning("⚠️ **IMPORTANTE:** Após digitar os valores, clique FORA do campo antes de clicar em 'Registrar Venda'. Não pressione Enter!")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                quantidade = st.number_input(
-                    "📦 Quantidade",
-                    min_value=0,
-                    value=1,
-                    step=1,
-                    key="qtd_venda"
-                )
-            
-            with col2:
-                valor = st.number_input(
-                    "💵 Valor Total da Venda (R$)",
-                    min_value=0.00,
-                    value=0.00,
-                    step=0.01,
-                    format="%.2f",
-                    key="valor_venda"
-                )
-            
-            with col3:
-                taxa_entrega = st.number_input(
-                    "🚚 Taxa Entrega (R$)",
-                    min_value=0.00,
-                    value=0.00,
-                    step=0.01,
-                    format="%.2f",
-                    help="Valor cobrado do cliente pela entrega",
-                    key="taxa_entrega"
-                )
-            
-            st.markdown("---")
-            submitted = st.form_submit_button("✅ Registrar Venda", use_container_width=True, type="primary")
+        st.markdown("### Informações da Venda")
+        
+        # Campos fora do form para evitar problema do Enter
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            quantidade = st.number_input(
+                "📦 Quantidade",
+                min_value=0,
+                value=1,
+                step=1,
+                key="qtd_venda"
+            )
+        
+        with col2:
+            valor = st.number_input(
+                "💵 Valor Total da Venda (R$)",
+                min_value=0.00,
+                value=0.00,
+                step=0.01,
+                format="%.2f",
+                key="valor_venda"
+            )
+        
+        with col3:
+            taxa_entrega = st.number_input(
+                "🚚 Taxa Entrega (R$)",
+                min_value=0.00,
+                value=0.00,
+                step=0.01,
+                format="%.2f",
+                help="Valor cobrado do cliente pela entrega",
+                key="taxa_entrega"
+            )
+        
+        st.markdown("---")
+        
+        # Botão de submit fora do form
+        if st.button("✅ Registrar Venda", use_container_width=True, type="primary", key="btn_submit_venda"):
+            submitted = True
+        else:
+            submitted = False
         
         if submitted:
             if valor <= 0:
