@@ -186,6 +186,25 @@ def extrair_dados_xml_nfe(xml_content):
         nf_element = root.find('.//nfe:ide/nfe:nNF', ns)
         numero_nf = nf_element.text if nf_element is not None else ""
         
+        # Extrair itens da nota
+        itens = []
+        det_elements = root.findall('.//nfe:det', ns)
+        for det in det_elements:
+            prod = det.find('nfe:prod', ns)
+            if prod is not None:
+                nome_prod = prod.find('nfe:xProd', ns)
+                qtd_prod = prod.find('nfe:qCom', ns)
+                valor_unit = prod.find('nfe:vUnCom', ns)
+                valor_prod = prod.find('nfe:vProd', ns)
+                
+                item = {
+                    'produto': nome_prod.text if nome_prod is not None else "Produto",
+                    'quantidade': float(qtd_prod.text) if qtd_prod is not None else 0,
+                    'valor_unitario': float(valor_unit.text) if valor_unit is not None else 0,
+                    'valor_total': float(valor_prod.text) if valor_prod is not None else 0
+                }
+                itens.append(item)
+        
         # Criar descrição
         descricao = f"Compra {nome_fornecedor}"
         if numero_nf:
@@ -195,6 +214,7 @@ def extrair_dados_xml_nfe(xml_content):
             "valor_total": valor_total,
             "data": data_emissao,
             "descricao": descricao,
+            "itens": itens,
             "sucesso": True,
             "mensagem": "XML lido com sucesso!"
         }
@@ -203,6 +223,7 @@ def extrair_dados_xml_nfe(xml_content):
             "valor_total": 0.0,
             "data": datetime.now(),
             "descricao": "",
+            "itens": [],
             "sucesso": False,
             "mensagem": f"Erro ao ler XML: {str(e)}"
         }
@@ -605,6 +626,24 @@ def main():
                             st.metric("🏪 Fornecedor", dados['descricao'].split(' - ')[0].replace('Compra ', ''))
                         
                         st.info(f"📝 Descrição: {dados['descricao']}")
+                        
+                        # Mostrar itens da nota fiscal
+                        if dados['itens']:
+                            st.markdown("---")
+                            st.markdown("### 🛒 Itens da Nota Fiscal")
+                            st.markdown(f"**Total de itens:** {len(dados['itens'])}")
+                            
+                            # Criar DataFrame com os itens
+                            df_itens = pd.DataFrame(dados['itens'])
+                            df_itens['quantidade'] = df_itens['quantidade'].apply(lambda x: f"{x:.2f}")
+                            df_itens['valor_unitario'] = df_itens['valor_unitario'].apply(lambda x: f"R$ {x:.2f}")
+                            df_itens['valor_total'] = df_itens['valor_total'].apply(lambda x: f"R$ {x:.2f}")
+                            
+                            # Renomear colunas
+                            df_itens.columns = ['Produto', 'Quantidade', 'Valor Unit.', 'Valor Total']
+                            
+                            # Mostrar tabela
+                            st.dataframe(df_itens, use_container_width=True, hide_index=True)
                         
                         st.markdown("---")
                         
