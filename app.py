@@ -449,29 +449,32 @@ def main():
     elif opcao == "💰 Lançar Venda":
         st.markdown("## 💰 Lançar Nova Venda")
         
+        # Seletores fora do form para atualização em tempo real
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            produto = st.selectbox(
+                "🎁 Selecione a Box",
+                options=BOXES,
+                index=0,
+                key="produto_select"
+            )
+        
+        with col2:
+            tamanho = st.selectbox(
+                "📏 Tamanho da Box",
+                options=list(TAMANHOS.keys()),
+                index=0,
+                help="O custo será registrado automaticamente",
+                key="tamanho_select"
+            )
+        
+        # Mostrar o custo que será registrado (atualiza em tempo real)
+        custo_box = TAMANHOS[tamanho]
+        st.info(f"💰 Custo desta box: R$ {custo_box:,.2f} (será registrado automaticamente nas compras)")
+        
         with st.form("form_venda"):
             st.markdown("### Informações da Venda")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                produto = st.selectbox(
-                    "🎁 Selecione a Box",
-                    options=BOXES,
-                    index=0
-                )
-            
-            with col2:
-                tamanho = st.selectbox(
-                    "📏 Tamanho da Box",
-                    options=list(TAMANHOS.keys()),
-                    index=0,
-                    help="O custo será registrado automaticamente"
-                )
-            
-            # Mostrar o custo que será registrado
-            custo_box = TAMANHOS[tamanho]
-            st.info(f"💰 Custo desta box: R$ {custo_box:,.2f} (será registrado automaticamente nas compras)")
             
             col1, col2, col3 = st.columns(3)
             
