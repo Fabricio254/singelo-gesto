@@ -3,6 +3,7 @@ from datetime import datetime
 from supabase import create_client, Client
 import pandas as pd
 from PIL import Image
+import xml.etree.ElementTree as ET
 
 # ==================== CONFIGURAÇÕES ====================
 # Configurações do Supabase
@@ -155,10 +156,61 @@ def criar_tabelas():
     📝 Execute o script SQL fornecido no arquivo 'criar_tabelas.sql'
     """)
 
-def inserir_compra(supabase: Client, valor_total: float, descricao: str = ""):
+def extrair_dados_xml_nfe(xml_content):
+    """Extrai dados relevantes do XML da NF-e"""
+    try:
+        # Parse do XML
+        root = ET.fromstring(xml_content)
+        
+        # Namespace da NF-e
+        ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
+        
+        # Extrair valor total
+        valor_element = root.find('.//nfe:total/nfe:ICMSTot/nfe:vNF', ns)
+        valor_total = float(valor_element.text) if valor_element is not None else 0.0
+        
+        # Extrair data de emissão
+        data_element = root.find('.//nfe:ide/nfe:dhEmi', ns)
+        if data_element is not None:
+            data_emissao = datetime.fromisoformat(data_element.text.replace('Z', '+00:00'))
+        else:
+            data_emissao = datetime.now()
+        
+        # Extrair nome do fornecedor
+        nome_element = root.find('.//nfe:emit/nfe:xFant', ns)
+        if nome_element is None:
+            nome_element = root.find('.//nfe:emit/nfe:xNome', ns)
+        nome_fornecedor = nome_element.text if nome_element is not None else "Fornecedor"
+        
+        # Extrair número da nota
+        nf_element = root.find('.//nfe:ide/nfe:nNF', ns)
+        numero_nf = nf_element.text if nf_element is not None else ""
+        
+        # Criar descrição
+        descricao = f"Compra {nome_fornecedor}"
+        if numero_nf:
+            descricao += f" - NF {numero_nf}"
+        
+        return {
+            "valor_total": valor_total,
+            "data": data_emissao,
+            "descricao": descricao,
+            "sucesso": True,
+            "mensagem": "XML lido com sucesso!"
+        }
+    except Exception as e:
+        return {
+            "valor_total": 0.0,
+            "data": datetime.now(),
+            "descricao": "",
+            "sucesso": False,
+            "mensagem": f"Erro ao ler XML: {str(e)}"
+        }
+
+def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", data_compra=None):
     """Insere uma nova compra no banco"""
     data = {
-        "data": datetime.now().isoformat(),
+        "data": data_compra.isoformat() if data_compra else datetime.now().isoformat(),
         "valor_total": valor_total,
         "descricao": descricao
     }
@@ -481,39 +533,103 @@ def main():
     elif opcao == "🛒 Lançar Compra":
         st.markdown("## 🛒 Lançar Nova Compra")
         
-        with st.form("form_compra"):
-            st.markdown("### Informações da Compra")
-            
-            valor = st.number_input(
-                "💵 Valor Total da Compra (R$)",
-                min_value=0.01,
-                value=0.01,
-                step=0.01,
-                format="%.2f"
-            )
-            
-            descricao = st.text_area(
-                "📝 Descrição (opcional)",
-                placeholder="Ex: Compra de materiais, embalagens, ingredientes..."
-            )
-            
-            submitted = st.form_submit_button("✅ Registrar Compra", use_container_width=True)
+        # Tabs para escolher entre manual e XML
+        tab1, tab2 = st.tabs(["✍️ Digitar Manualmente", "📄 Importar XML do Cupom"])
         
-        if submitted:
-            if valor > 0:
+        with tab1:
+            with st.form("form_compra"):
+                st.markdown("### Informações da Compra")
+                
+                valor = st.number_input(
+                    "💵 Valor Total da Compra (R$)",
+                    min_value=0.01,
+                    value=0.01,
+                    step=0.01,
+                    format="%.2f"
+                )
+                
+                descricao = st.text_area(
+                    "📝 Descrição (opcional)",
+                    placeholder="Ex: Compra de materiais, embalagens, ingredientes..."
+                )
+                
+                submitted = st.form_submit_button("✅ Registrar Compra", use_container_width=True)
+            
+            if submitted:
+                if valor > 0:
+                    try:
+                        inserir_compra(supabase, valor, descricao)
+                        st.markdown(f"""
+                            <div class='success-message'>
+                                ✅ <strong>Compra registrada com sucesso!</strong><br>
+                                Valor: R$ {valor:,.2f}
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao registrar compra: {str(e)}")
+                else:
+                    st.warning("⚠️ O valor deve ser maior que zero")
+        
+        with tab2:
+            st.markdown("### 📄 Importar XML da Nota Fiscal")
+            st.info("💡 **Como obter o XML:** Escaneie o QR Code do cupom fiscal com seu celular e faça o download do arquivo XML")
+            
+            uploaded_file = st.file_uploader(
+                "Selecione o arquivo XML",
+                type=['xml'],
+                help="Faça upload do arquivo XML da NF-e",
+                key="xml_upload"
+            )
+            
+            if uploaded_file is not None:
                 try:
-                    inserir_compra(supabase, valor, descricao)
-                    st.markdown(f"""
-                        <div class='success-message'>
-                            ✅ <strong>Compra registrada com sucesso!</strong><br>
-                            Valor: R$ {valor:,.2f}
-                        </div>
-                    """, unsafe_allow_html=True)
-                    st.balloons()
+                    # Ler conteúdo do arquivo
+                    xml_content = uploaded_file.read()
+                    
+                    # Extrair dados do XML
+                    dados = extrair_dados_xml_nfe(xml_content)
+                    
+                    if dados['sucesso']:
+                        st.success(dados['mensagem'])
+                        
+                        # Mostrar dados extraídos
+                        st.markdown("### 📊 Dados Extraídos do XML")
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.metric("💵 Valor Total", f"R$ {dados['valor_total']:,.2f}")
+                        with col2:
+                            st.metric("📅 Data", dados['data'].strftime('%d/%m/%Y'))
+                        with col3:
+                            st.metric("🏪 Fornecedor", dados['descricao'].split(' - ')[0].replace('Compra ', ''))
+                        
+                        st.info(f"📝 Descrição: {dados['descricao']}")
+                        
+                        st.markdown("---")
+                        
+                        # Botão para confirmar importação
+                        if st.button("✅ Confirmar e Registrar Compra", use_container_width=True, type="primary", key="btn_confirmar_xml"):
+                            try:
+                                inserir_compra(supabase, dados['valor_total'], dados['descricao'], dados['data'])
+                                st.markdown(f"""
+                                    <div class='success-message'>
+                                        ✅ <strong>Compra importada e registrada com sucesso!</strong><br>
+                                        Fornecedor: {dados['descricao']}<br>
+                                        Valor: R$ {dados['valor_total']:,.2f}<br>
+                                        Data: {dados['data'].strftime('%d/%m/%Y %H:%M')}
+                                    </div>
+                                """, unsafe_allow_html=True)
+                                st.balloons()
+                            except Exception as e:
+                                st.error(f"❌ Erro ao registrar compra: {str(e)}")
+                    else:
+                        st.error(dados['mensagem'])
+                        st.warning("⚠️ Verifique se o arquivo é um XML válido de NF-e")
+                        
                 except Exception as e:
-                    st.error(f"❌ Erro ao registrar compra: {str(e)}")
-            else:
-                st.warning("⚠️ O valor deve ser maior que zero")
+                    st.error(f"❌ Erro ao processar arquivo: {str(e)}")
+                    st.warning("⚠️ Certifique-se de que o arquivo é um XML válido de Nota Fiscal Eletrônica")
     
     # ==================== LANÇAR VENDA ====================
     elif opcao == "💰 Lançar Venda":
