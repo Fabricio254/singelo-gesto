@@ -478,7 +478,7 @@ def main():
             with col1:
                 quantidade = st.number_input(
                     "📦 Quantidade",
-                    min_value=1,
+                    min_value=0,
                     value=1,
                     step=1
                 )
@@ -486,8 +486,8 @@ def main():
             with col2:
                 valor = st.number_input(
                     "💵 Valor Total da Venda (R$)",
-                    min_value=0.01,
-                    value=0.01,
+                    min_value=0.00,
+                    value=0.00,
                     step=0.01,
                     format="%.2f"
                 )
@@ -505,7 +505,11 @@ def main():
             submitted = st.form_submit_button("✅ Registrar Venda", use_container_width=True)
         
         if submitted:
-            if valor > 0 and quantidade > 0:
+            if valor <= 0:
+                st.error("❌ O valor da venda deve ser maior que zero!")
+            elif quantidade <= 0:
+                st.error("❌ A quantidade deve ser maior que zero!")
+            else:
                 try:
                     # Registrar a venda
                     inserir_venda(supabase, produto, quantidade, valor, taxa_entrega, tamanho)
@@ -527,8 +531,6 @@ def main():
                     st.balloons()
                 except Exception as e:
                     st.error(f"❌ Erro ao registrar venda: {str(e)}")
-            else:
-                st.warning("⚠️ Valor e quantidade devem ser maiores que zero")
     
     # ==================== CUSTO ENTREGADOR ====================
     elif opcao == "🚚 Custo Entregador":
