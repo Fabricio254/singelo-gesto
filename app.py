@@ -155,16 +155,32 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = ""):
     result = supabase.table("singelo_compras").insert(data).execute()
     return result
 
-def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: float):
+def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: float, taxa_entrega: float = 0):
     """Insere uma nova venda no banco"""
     data = {
         "data": datetime.now().isoformat(),
         "produto": produto,
         "quantidade": quantidade,
-        "valor_total": valor_total
+        "valor_total": valor_total,
+        "taxa_entrega": taxa_entrega
     }
     result = supabase.table("singelo_vendas").insert(data).execute()
     return result
+
+def inserir_entrega(supabase: Client, custo_entregador: float, descricao: str = ""):
+    """Insere um custo de entregador no banco"""
+    data = {
+        "data": datetime.now().isoformat(),
+        "custo_entregador": custo_entregador,
+        "descricao": descricao
+    }
+    result = supabase.table("singelo_entregas").insert(data).execute()
+    return result
+
+def buscar_entregas(supabase: Client, limite: int = 50):
+    """Busca os últimos custos de entrega"""
+    result = supabase.table("singelo_entregas").select("*").order("data", desc=True).limit(limite).execute()
+    return result.data
 
 def buscar_compras(supabase: Client, limite: int = 50):
     """Busca as últimas compras"""
@@ -180,21 +196,32 @@ def calcular_resumo(supabase: Client):
     """Calcula o resumo financeiro"""
     try:
         compras = supabase.table("singelo_compras").select("valor_total").execute()
-        vendas = supabase.table("singelo_vendas").select("valor_total").execute()
+        vendas = supabase.table("singelo_vendas").select("valor_total, taxa_entrega").execute()
+        entregas = supabase.table("singelo_entregas").select("custo_entregador").execute()
         
         total_compras = sum([float(c['valor_total']) for c in compras.data]) if compras.data else 0
         total_vendas = sum([float(v['valor_total']) for v in vendas.data]) if vendas.data else 0
+        total_taxa_entrega_cobrada = sum([float(v.get('taxa_entrega', 0)) for v in vendas.data]) if vendas.data else 0
+        total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
+        
+        lucro_entregas = total_taxa_entrega_cobrada - total_custo_entregador
         lucro = total_vendas - total_compras
         
         return {
             "total_compras": total_compras,
             "total_vendas": total_vendas,
+            "total_taxa_entrega_cobrada": total_taxa_entrega_cobrada,
+            "total_custo_entregador": total_custo_entregador,
+            "lucro_entregas": lucro_entregas,
             "lucro": lucro
         }
     except Exception as e:
         return {
             "total_compras": 0,
             "total_vendas": 0,
+            "total_taxa_entrega_cobrada": 0,
+            "total_custo_entregador": 0,
+            "lucro_entregas": 0,
             "lucro": 0
         }
 
@@ -238,7 +265,7 @@ def main():
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
             "Selecione uma opção:",
-            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "📋 Histórico"],
+            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "� Custo Entregador", "�📋 Histórico"],
             label_visibility="collapsed"
         )
         
@@ -253,6 +280,7 @@ def main():
         
         resumo = calcular_resumo(supabase)
         
+        # Linha 1: Vendas e Compras
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -275,8 +303,38 @@ def main():
             lucro_color = "#28A745" if resumo['lucro'] >= 0 else "#DC3545"
             st.markdown(f"""
                 <div class='metric-card' style='background: {lucro_color};'>
-                    <h3>📊 Lucro</h3>
+                    <h3>📊 Lucro Vendas</h3>
                     <h2>R$ {resumo['lucro']:,.2f}</h2>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        # Linha 2: Entregas
+        st.markdown("### 🚚 Controle de Entregas")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown(f"""
+                <div class='metric-card' style='background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);'>
+                    <h3>💵 Taxa Cobrada</h3>
+                    <h2>R$ {resumo['total_taxa_entrega_cobrada']:,.2f}</h2>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+                <div class='metric-card' style='background: linear-gradient(135deg, #E67E22 0%, #D35400 100%);'>
+                    <h3>🚚 Custo Entregador</h3>
+                    <h2>R$ {resumo['total_custo_entregador']:,.2f}</h2>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            lucro_entrega_color = "#28A745" if resumo['lucro_entregas'] >= 0 else "#DC3545"
+            status_entrega = "Lucro" if resumo['lucro_entregas'] >= 0 else "Prejuízo"
+            st.markdown(f"""
+                <div class='metric-card' style='background: {lucro_entrega_color};'>
+                    <h3>📊 {status_entrega} Entregas</h3>
+                    <h2>R$ {resumo['lucro_entregas']:,.2f}</h2>
                 </div>
             """, unsafe_allow_html=True)
         
@@ -369,7 +427,7 @@ def main():
                 index=0
             )
             
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             
             with col1:
                 quantidade = st.number_input(
@@ -388,17 +446,28 @@ def main():
                     format="%.2f"
                 )
             
+            with col3:
+                taxa_entrega = st.number_input(
+                    "🚚 Taxa Entrega (R$)",
+                    min_value=0.00,
+                    value=0.00,
+                    step=0.01,
+                    format="%.2f",
+                    help="Valor cobrado do cliente pela entrega"
+                )
+            
             submitted = st.form_submit_button("✅ Registrar Venda", use_container_width=True)
         
         if submitted:
             if valor > 0 and quantidade > 0:
                 try:
-                    inserir_venda(supabase, produto, quantidade, valor)
+                    inserir_venda(supabase, produto, quantidade, valor, taxa_entrega)
                     st.markdown(f"""
                         <div class='success-message'>
                             ✅ <strong>Venda registrada com sucesso!</strong><br>
                             {produto} - {quantidade} unidade(s)<br>
-                            Valor: R$ {valor:,.2f}
+                            Valor: R$ {valor:,.2f}<br>
+                            Taxa Entrega: R$ {taxa_entrega:,.2f}
                         </div>
                     """, unsafe_allow_html=True)
                     st.balloons()
@@ -407,11 +476,50 @@ def main():
             else:
                 st.warning("⚠️ Valor e quantidade devem ser maiores que zero")
     
+    # ==================== CUSTO ENTREGADOR ====================
+    elif opcao == "🚚 Custo Entregador":
+        st.markdown("## 🚚 Lançar Custo de Entregador")
+        
+        with st.form("form_entrega"):
+            st.markdown("### Informações do Custo")
+            
+            custo = st.number_input(
+                "💵 Valor Pago ao Entregador (R$)",
+                min_value=0.01,
+                value=0.01,
+                step=0.01,
+                format="%.2f",
+                help="Quanto você pagou ao entregador"
+            )
+            
+            descricao = st.text_area(
+                "📝 Descrição (opcional)",
+                placeholder="Ex: Entrega bairro X, 3 pedidos..."
+            )
+            
+            submitted = st.form_submit_button("✅ Registrar Custo", use_container_width=True)
+        
+        if submitted:
+            if custo > 0:
+                try:
+                    inserir_entrega(supabase, custo, descricao)
+                    st.markdown(f"""
+                        <div class='success-message'>
+                            ✅ <strong>Custo de entrega registrado com sucesso!</strong><br>
+                            Valor: R$ {custo:,.2f}
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"❌ Erro ao registrar custo: {str(e)}")
+            else:
+                st.warning("⚠️ O valor deve ser maior que zero")
+    
     # ==================== HISTÓRICO ====================
     elif opcao == "📋 Histórico":
         st.markdown("## 📋 Histórico de Movimentações")
         
-        tab1, tab2 = st.tabs(["🛒 Compras", "💰 Vendas"])
+        tab1, tab2, tab3 = st.tabs(["🛒 Compras", "💰 Vendas", "🚚 Entregas"])
         
         with tab1:
             st.markdown("### 🛒 Histórico de Compras")
@@ -442,10 +550,11 @@ def main():
                 df_vendas = pd.DataFrame(vendas)
                 df_vendas['data'] = pd.to_datetime(df_vendas['data']).dt.strftime('%d/%m/%Y %H:%M')
                 df_vendas['valor_total'] = df_vendas['valor_total'].apply(lambda x: f"R$ {float(x):,.2f}")
+                df_vendas['taxa_entrega'] = df_vendas.get('taxa_entrega', 0).apply(lambda x: f"R$ {float(x if x else 0):,.2f}")
                 
                 # Renomear colunas
-                df_vendas = df_vendas[['data', 'produto', 'quantidade', 'valor_total']]
-                df_vendas.columns = ['Data', 'Produto', 'Quantidade', 'Valor']
+                df_vendas = df_vendas[['data', 'produto', 'quantidade', 'valor_total', 'taxa_entrega']]
+                df_vendas.columns = ['Data', 'Produto', 'Qtd', 'Valor', 'Taxa Entrega']
                 
                 st.dataframe(df_vendas, use_container_width=True, hide_index=True)
                 
@@ -464,9 +573,32 @@ def main():
                 
                 # Total
                 total = sum([float(v['valor_total']) for v in vendas])
+                total_taxa = sum([float(v.get('taxa_entrega', 0)) for v in vendas])
                 st.markdown(f"**Total de Vendas:** R$ {total:,.2f}")
+                st.markdown(f"**Total Taxa Entrega Cobrada:** R$ {total_taxa:,.2f}")
             else:
                 st.info("📭 Nenhuma venda registrada ainda")
+        
+        with tab3:
+            st.markdown("### 🚚 Histórico de Custos de Entrega")
+            entregas = buscar_entregas(supabase, 100)
+            
+            if entregas:
+                df_entregas = pd.DataFrame(entregas)
+                df_entregas['data'] = pd.to_datetime(df_entregas['data']).dt.strftime('%d/%m/%Y %H:%M')
+                df_entregas['custo_entregador'] = df_entregas['custo_entregador'].apply(lambda x: f"R$ {float(x):,.2f}")
+                
+                # Renomear colunas
+                df_entregas = df_entregas[['data', 'custo_entregador', 'descricao']]
+                df_entregas.columns = ['Data', 'Custo', 'Descrição']
+                
+                st.dataframe(df_entregas, use_container_width=True, hide_index=True)
+                
+                # Total
+                total = sum([float(e['custo_entregador']) for e in entregas])
+                st.markdown(f"**Total Pago aos Entregadores:** R$ {total:,.2f}")
+            else:
+                st.info("📭 Nenhum custo de entrega registrado ainda")
 
 if __name__ == "__main__":
     main()
