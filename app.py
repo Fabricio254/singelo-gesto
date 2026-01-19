@@ -4,6 +4,7 @@ from supabase import create_client, Client
 import pandas as pd
 from PIL import Image
 import xml.etree.ElementTree as ET
+import requests
 
 # ==================== CONFIGURAÇÕES ====================
 # Configurações do Supabase
@@ -155,6 +156,59 @@ def criar_tabelas():
     
     📝 Execute o script SQL fornecido no arquivo 'criar_tabelas.sql'
     """)
+
+def buscar_xml_por_chave(chave_acesso):
+    """Busca o XML da NF-e pela chave de acesso de 44 dígitos"""
+    try:
+        # Validar se tem 44 dígitos
+        if len(chave_acesso) != 44 or not chave_acesso.isdigit():
+            return {
+                "sucesso": False,
+                "mensagem": "A chave de acesso deve ter exatamente 44 dígitos numéricos"
+            }
+        
+        # Extrair UF da chave (2 primeiros dígitos)
+        uf_codigo = chave_acesso[:2]
+        
+        # Mapa de códigos de UF
+        uf_map = {
+            '35': 'SP', '33': 'RJ', '31': 'MG', '41': 'PR', '42': 'SC', '43': 'RS',
+            '53': 'DF', '52': 'GO', '51': 'MT', '50': 'MS', '11': 'RO', '12': 'AC',
+            '13': 'AM', '14': 'RR', '15': 'PA', '16': 'AP', '17': 'TO', '21': 'MA',
+            '22': 'PI', '23': 'CE', '24': 'RN', '25': 'PB', '26': 'PE', '27': 'AL',
+            '28': 'SE', '29': 'BA', '32': 'ES'
+        }
+        
+        uf = uf_map.get(uf_codigo, 'Desconhecido')
+        
+        # Montar URL da SEFAZ (exemplo para SP)
+        # Nota: Cada estado tem sua própria URL e pode requerer autenticação
+        if uf == 'SP':
+            url = f"https://www.nfe.fazenda.sp.gov.br/NFeConsultaPublica/Documento.aspx?chNFe={chave_acesso}"
+        else:
+            # Para outros estados, retornar link genérico
+            return {
+                "sucesso": False,
+                "mensagem": f"Download automático não disponível para {uf}. Use o QR Code ou acesse manualmente o site da SEFAZ-{uf}",
+                "url": None,
+                "chave": chave_acesso,
+                "uf": uf
+            }
+        
+        return {
+            "sucesso": False,
+            "mensagem": f"Para SP, acesse o Portal da Nota Fiscal Paulista ou use o QR Code do cupom",
+            "url": url,
+            "chave": chave_acesso,
+            "uf": uf,
+            "instrucoes": "O download automático por chave não está disponível devido às restrições de segurança da SEFAZ. Use o QR Code do cupom fiscal para obter o XML rapidamente."
+        }
+        
+    except Exception as e:
+        return {
+            "sucesso": False,
+            "mensagem": f"Erro ao processar chave: {str(e)}"
+        }
 
 def extrair_dados_xml_nfe(xml_content):
     """Extrai dados relevantes do XML da NF-e"""
@@ -554,8 +608,8 @@ def main():
     elif opcao == "🛒 Lançar Compra":
         st.markdown("## 🛒 Lançar Nova Compra")
         
-        # Tabs para escolher entre manual e XML
-        tab1, tab2 = st.tabs(["✍️ Digitar Manualmente", "📄 Importar XML do Cupom"])
+        # Tabs para escolher entre manual, XML e chave de acesso
+        tab1, tab2, tab3 = st.tabs(["✍️ Digitar Manualmente", "📄 Importar XML", "🔑 Buscar por Chave"])
         
         with tab1:
             with st.form("form_compra"):
@@ -669,6 +723,58 @@ def main():
                 except Exception as e:
                     st.error(f"❌ Erro ao processar arquivo: {str(e)}")
                     st.warning("⚠️ Certifique-se de que o arquivo é um XML válido de Nota Fiscal Eletrônica")
+        
+        with tab3:
+            st.markdown("### 🔑 Buscar XML pela Chave de Acesso")
+            st.info("💡 **Onde encontrar:** A chave de acesso de 44 dígitos está no rodapé do cupom fiscal")
+            
+            # Campo para digitar a chave
+            chave_acesso = st.text_input(
+                "Digite a Chave de Acesso (44 dígitos)",
+                max_chars=44,
+                placeholder="Ex: 35240112345678901234550010000123451234567890",
+                help="Digite apenas números, sem espaços ou caracteres especiais",
+                key="chave_acesso_input"
+            )
+            
+            # Botão para buscar
+            if st.button("🔍 Buscar XML", use_container_width=True, type="primary", key="btn_buscar_chave"):
+                if chave_acesso:
+                    # Remover espaços e caracteres não numéricos
+                    chave_limpa = ''.join(filter(str.isdigit, chave_acesso))
+                    
+                    with st.spinner("Buscando informações da nota fiscal..."):
+                        resultado = buscar_xml_por_chave(chave_limpa)
+                    
+                    if resultado.get('sucesso'):
+                        st.success(resultado['mensagem'])
+                    else:
+                        st.warning(resultado['mensagem'])
+                        
+                        if 'uf' in resultado:
+                            st.markdown(f"**🗺️ Estado:** {resultado['uf']}")
+                        
+                        if 'instrucoes' in resultado:
+                            st.info(f"ℹ️ {resultado['instrucoes']}")
+                        
+                        # Mostrar instruções alternativas
+                        st.markdown("---")
+                        st.markdown("### 📱 Alternativa Recomendada: Use o QR Code")
+                        st.markdown("""
+                        **Passos para obter o XML pelo QR Code:**
+                        1. 📸 Abra a câmera do celular
+                        2. 🎯 Aponte para o QR Code do cupom
+                        3. 🌐 Abrirá um link da SEFAZ
+                        4. 📥 Clique em "Download XML" ou "Baixar XML"
+                        5. 💾 Salve o arquivo
+                        6. ⬆️ Volte aqui e faça upload na aba "Importar XML"
+                        """)
+                        
+                        # Mostrar link se disponível
+                        if 'url' in resultado and resultado['url']:
+                            st.markdown(f"**🔗 Ou acesse diretamente:** [Portal da SEFAZ]({resultado['url']})")
+                else:
+                    st.warning("⚠️ Digite a chave de acesso de 44 dígitos")
     
     # ==================== LANÇAR VENDA ====================
     elif opcao == "💰 Lançar Venda":
