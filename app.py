@@ -296,7 +296,7 @@ def main():
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
             "Selecione uma opção:",
-            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "� Custo Entregador", "�📋 Histórico"],
+            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "📋 Histórico"],
             label_visibility="collapsed"
         )
         
