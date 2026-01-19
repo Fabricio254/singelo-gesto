@@ -193,6 +193,21 @@ def buscar_entregas(supabase: Client, limite: int = 50):
     result = supabase.table("singelo_entregas").select("*").order("data", desc=True).limit(limite).execute()
     return result.data
 
+def excluir_compra(supabase: Client, compra_id: int):
+    """Exclui uma compra do banco"""
+    result = supabase.table("singelo_compras").delete().eq("id", compra_id).execute()
+    return result
+
+def excluir_venda(supabase: Client, venda_id: int):
+    """Exclui uma venda do banco"""
+    result = supabase.table("singelo_vendas").delete().eq("id", venda_id).execute()
+    return result
+
+def excluir_entrega(supabase: Client, entrega_id: int):
+    """Exclui um custo de entrega do banco"""
+    result = supabase.table("singelo_entregas").delete().eq("id", entrega_id).execute()
+    return result
+
 def buscar_compras(supabase: Client, limite: int = 50):
     """Busca as últimas compras"""
     result = supabase.table("singelo_compras").select("*").order("data", desc=True).limit(limite).execute()
@@ -560,19 +575,33 @@ def main():
             compras = buscar_compras(supabase, 100)
             
             if compras:
-                df_compras = pd.DataFrame(compras)
-                df_compras['data'] = pd.to_datetime(df_compras['data']).dt.strftime('%d/%m/%Y %H:%M')
-                df_compras['valor_total'] = df_compras['valor_total'].apply(lambda x: f"R$ {float(x):,.2f}")
-                
-                # Renomear colunas
-                df_compras = df_compras[['data', 'valor_total', 'descricao']]
-                df_compras.columns = ['Data', 'Valor', 'Descrição']
-                
-                st.dataframe(df_compras, use_container_width=True, hide_index=True)
-                
                 # Total
                 total = sum([float(c['valor_total']) for c in compras])
                 st.markdown(f"**Total de Compras:** R$ {total:,.2f}")
+                st.markdown("---")
+                
+                # Mostrar cada compra com botão de excluir
+                for compra in compras:
+                    col1, col2, col3, col4 = st.columns([2, 2, 3, 1])
+                    
+                    data_formatada = datetime.fromisoformat(compra['data'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
+                    
+                    with col1:
+                        st.write(f"📅 {data_formatada}")
+                    with col2:
+                        st.write(f"💵 R$ {float(compra['valor_total']):,.2f}")
+                    with col3:
+                        st.write(f"📝 {compra.get('descricao', '-')}")
+                    with col4:
+                        if st.button("🗑️", key=f"del_compra_{compra['id']}", help="Excluir", use_container_width=True):
+                            try:
+                                excluir_compra(supabase, compra['id'])
+                                st.success("✅ Compra excluída!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Erro: {str(e)}")
+                    
+                    st.markdown("---")
             else:
                 st.info("📭 Nenhuma compra registrada ainda")
         
@@ -581,17 +610,44 @@ def main():
             vendas = buscar_vendas(supabase, 100)
             
             if vendas:
-                df_vendas = pd.DataFrame(vendas)
-                df_vendas['data'] = pd.to_datetime(df_vendas['data']).dt.strftime('%d/%m/%Y %H:%M')
-                df_vendas['valor_total'] = df_vendas['valor_total'].apply(lambda x: f"R$ {float(x):,.2f}")
-                df_vendas['taxa_entrega'] = df_vendas.get('taxa_entrega', 0).apply(lambda x: f"R$ {float(x if x else 0):,.2f}")
-                df_vendas['tamanho'] = df_vendas.get('tamanho', 'N/A')
+                # Resumo
+                total = sum([float(v['valor_total']) for v in vendas])
+                total_taxa = sum([float(v.get('taxa_entrega', 0)) for v in vendas])
                 
-                # Renomear colunas
-                df_vendas = df_vendas[['data', 'produto', 'tamanho', 'quantidade', 'valor_total', 'taxa_entrega']]
-                df_vendas.columns = ['Data', 'Produto', 'Tamanho', 'Qtd', 'Valor', 'Taxa Entrega']
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"**Total de Vendas:** R$ {total:,.2f}")
+                with col2:
+                    st.markdown(f"**Total Taxa Entrega:** R$ {total_taxa:,.2f}")
                 
-                st.dataframe(df_vendas, use_container_width=True, hide_index=True)
+                st.markdown("---")
+                
+                # Mostrar cada venda com botão de excluir
+                for venda in vendas:
+                    col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1.5, 1, 1.5, 1])
+                    
+                    data_formatada = datetime.fromisoformat(venda['data'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
+                    
+                    with col1:
+                        st.write(f"📅 {data_formatada}")
+                    with col2:
+                        st.write(f"🎁 {venda['produto']}")
+                    with col3:
+                        st.write(f"📏 {venda.get('tamanho', 'N/A')}")
+                    with col4:
+                        st.write(f"📦 {venda['quantidade']}")
+                    with col5:
+                        st.write(f"💵 R$ {float(venda['valor_total']):,.2f}")
+                    with col6:
+                        if st.button("🗑️", key=f"del_venda_{venda['id']}", help="Excluir", use_container_width=True):
+                            try:
+                                excluir_venda(supabase, venda['id'])
+                                st.success("✅ Venda excluída!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Erro: {str(e)}")
+                    
+                    st.markdown("---")
                 
                 # Resumo por produto
                 st.markdown("#### 📊 Vendas por Produto")
@@ -605,12 +661,6 @@ def main():
                 
                 for produto, dados in vendas_por_produto.items():
                     st.markdown(f"**{produto}:** {dados['quantidade']} unidades - R$ {dados['valor']:,.2f}")
-                
-                # Total
-                total = sum([float(v['valor_total']) for v in vendas])
-                total_taxa = sum([float(v.get('taxa_entrega', 0)) for v in vendas])
-                st.markdown(f"**Total de Vendas:** R$ {total:,.2f}")
-                st.markdown(f"**Total Taxa Entrega Cobrada:** R$ {total_taxa:,.2f}")
             else:
                 st.info("📭 Nenhuma venda registrada ainda")
         
@@ -619,19 +669,33 @@ def main():
             entregas = buscar_entregas(supabase, 100)
             
             if entregas:
-                df_entregas = pd.DataFrame(entregas)
-                df_entregas['data'] = pd.to_datetime(df_entregas['data']).dt.strftime('%d/%m/%Y %H:%M')
-                df_entregas['custo_entregador'] = df_entregas['custo_entregador'].apply(lambda x: f"R$ {float(x):,.2f}")
-                
-                # Renomear colunas
-                df_entregas = df_entregas[['data', 'custo_entregador', 'descricao']]
-                df_entregas.columns = ['Data', 'Custo', 'Descrição']
-                
-                st.dataframe(df_entregas, use_container_width=True, hide_index=True)
-                
                 # Total
                 total = sum([float(e['custo_entregador']) for e in entregas])
                 st.markdown(f"**Total Pago aos Entregadores:** R$ {total:,.2f}")
+                st.markdown("---")
+                
+                # Mostrar cada entrega com botão de excluir
+                for entrega in entregas:
+                    col1, col2, col3, col4 = st.columns([2, 2, 3, 1])
+                    
+                    data_formatada = datetime.fromisoformat(entrega['data'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
+                    
+                    with col1:
+                        st.write(f"📅 {data_formatada}")
+                    with col2:
+                        st.write(f"💵 R$ {float(entrega['custo_entregador']):,.2f}")
+                    with col3:
+                        st.write(f"📝 {entrega.get('descricao', '-')}")
+                    with col4:
+                        if st.button("🗑️", key=f"del_entrega_{entrega['id']}", help="Excluir", use_container_width=True):
+                            try:
+                                excluir_entrega(supabase, entrega['id'])
+                                st.success("✅ Custo excluído!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Erro: {str(e)}")
+                    
+                    st.markdown("---")
             else:
                 st.info("📭 Nenhum custo de entrega registrado ainda")
 
