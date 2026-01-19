@@ -114,7 +114,8 @@ BOXES = [
     "Box Chocolate",
     "Box Maternidade",
     "Box Casamento",
-    "Box Aniversário"
+    "Box Aniversário",
+    "Box Formatura"
 ]
 
 # ==================== FUNÇÕES DO BANCO DE DADOS ====================
