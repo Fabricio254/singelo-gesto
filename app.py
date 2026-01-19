@@ -474,8 +474,9 @@ def main():
         custo_box = TAMANHOS[tamanho]
         st.info(f"💰 Custo desta box: R$ {custo_box:,.2f} (será registrado automaticamente nas compras)")
         
-        with st.form("form_venda"):
+        with st.form("form_venda", clear_on_submit=True):
             st.markdown("### Informações da Venda")
+            st.warning("⚠️ **IMPORTANTE:** Após digitar os valores, clique FORA do campo antes de clicar em 'Registrar Venda'. Não pressione Enter!")
             
             col1, col2, col3 = st.columns(3)
             
@@ -484,7 +485,8 @@ def main():
                     "📦 Quantidade",
                     min_value=0,
                     value=1,
-                    step=1
+                    step=1,
+                    key="qtd_venda"
                 )
             
             with col2:
@@ -493,7 +495,8 @@ def main():
                     min_value=0.00,
                     value=0.00,
                     step=0.01,
-                    format="%.2f"
+                    format="%.2f",
+                    key="valor_venda"
                 )
             
             with col3:
@@ -503,10 +506,12 @@ def main():
                     value=0.00,
                     step=0.01,
                     format="%.2f",
-                    help="Valor cobrado do cliente pela entrega"
+                    help="Valor cobrado do cliente pela entrega",
+                    key="taxa_entrega"
                 )
             
-            submitted = st.form_submit_button("✅ Registrar Venda", use_container_width=True)
+            st.markdown("---")
+            submitted = st.form_submit_button("✅ Registrar Venda", use_container_width=True, type="primary")
         
         if submitted:
             if valor <= 0:
