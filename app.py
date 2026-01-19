@@ -230,11 +230,14 @@ def calcular_resumo(supabase: Client):
         vendas = supabase.table("singelo_vendas").select("valor_total, taxa_entrega").execute()
         entregas = supabase.table("singelo_entregas").select("custo_entregador").execute()
         
-        total_compras = sum([float(c['valor_total']) for c in compras.data]) if compras.data else 0
+        total_compras_material = sum([float(c['valor_total']) for c in compras.data]) if compras.data else 0
+        total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
+        # Total de compras = compras de material + custo pago aos entregadores
+        total_compras = total_compras_material + total_custo_entregador
+        
         # Total de vendas = valor da venda + taxa de entrega cobrada do cliente
         total_vendas = sum([float(v['valor_total']) + float(v.get('taxa_entrega', 0)) for v in vendas.data]) if vendas.data else 0
         total_taxa_entrega_cobrada = sum([float(v.get('taxa_entrega', 0)) for v in vendas.data]) if vendas.data else 0
-        total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
         
         lucro_entregas = total_taxa_entrega_cobrada - total_custo_entregador
         lucro = total_vendas - total_compras
