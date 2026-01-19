@@ -118,6 +118,15 @@ BOXES = [
     "Box Formatura"
 ]
 
+# ==================== TAMANHOS E CUSTOS ====================
+TAMANHOS = {
+    "Box mini": 20.00,
+    "Box PP": 30.00,
+    "Box P": 40.00,
+    "Box M": 50.00,
+    "Box master": 60.00
+}
+
 # ==================== FUNÇÕES DO BANCO DE DADOS ====================
 def criar_tabelas():
     """Cria as tabelas no Supabase se não existirem"""
@@ -156,14 +165,15 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = ""):
     result = supabase.table("singelo_compras").insert(data).execute()
     return result
 
-def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: float, taxa_entrega: float = 0):
+def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: float, taxa_entrega: float = 0, tamanho: str = ""):
     """Insere uma nova venda no banco"""
     data = {
         "data": datetime.now().isoformat(),
         "produto": produto,
         "quantidade": quantidade,
         "valor_total": valor_total,
-        "taxa_entrega": taxa_entrega
+        "taxa_entrega": taxa_entrega,
+        "tamanho": tamanho
     }
     result = supabase.table("singelo_vendas").insert(data).execute()
     return result
@@ -422,11 +432,26 @@ def main():
         with st.form("form_venda"):
             st.markdown("### Informações da Venda")
             
-            produto = st.selectbox(
-                "🎁 Selecione a Box",
-                options=BOXES,
-                index=0
-            )
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                produto = st.selectbox(
+                    "🎁 Selecione a Box",
+                    options=BOXES,
+                    index=0
+                )
+            
+            with col2:
+                tamanho = st.selectbox(
+                    "📏 Tamanho da Box",
+                    options=list(TAMANHOS.keys()),
+                    index=0,
+                    help="O custo será registrado automaticamente"
+                )
+            
+            # Mostrar o custo que será registrado
+            custo_box = TAMANHOS[tamanho]
+            st.info(f"💰 Custo desta box: R$ {custo_box:,.2f} (será registrado automaticamente nas compras)")
             
             col1, col2, col3 = st.columns(3)
             
@@ -440,7 +465,7 @@ def main():
             
             with col2:
                 valor = st.number_input(
-                    "💵 Valor Total (R$)",
+                    "💵 Valor Total da Venda (R$)",
                     min_value=0.01,
                     value=0.01,
                     step=0.01,
@@ -462,13 +487,21 @@ def main():
         if submitted:
             if valor > 0 and quantidade > 0:
                 try:
-                    inserir_venda(supabase, produto, quantidade, valor, taxa_entrega)
+                    # Registrar a venda
+                    inserir_venda(supabase, produto, quantidade, valor, taxa_entrega, tamanho)
+                    
+                    # Registrar o custo da box automaticamente nas compras
+                    custo_total = custo_box * quantidade
+                    descricao_compra = f"Custo automático: {quantidade}x {tamanho} - {produto}"
+                    inserir_compra(supabase, custo_total, descricao_compra)
+                    
                     st.markdown(f"""
                         <div class='success-message'>
                             ✅ <strong>Venda registrada com sucesso!</strong><br>
-                            {produto} - {quantidade} unidade(s)<br>
-                            Valor: R$ {valor:,.2f}<br>
-                            Taxa Entrega: R$ {taxa_entrega:,.2f}
+                            {produto} ({tamanho}) - {quantidade} unidade(s)<br>
+                            Valor Venda: R$ {valor:,.2f}<br>
+                            Taxa Entrega: R$ {taxa_entrega:,.2f}<br>
+                            💰 Custo registrado: R$ {custo_total:,.2f}
                         </div>
                     """, unsafe_allow_html=True)
                     st.balloons()
@@ -552,10 +585,11 @@ def main():
                 df_vendas['data'] = pd.to_datetime(df_vendas['data']).dt.strftime('%d/%m/%Y %H:%M')
                 df_vendas['valor_total'] = df_vendas['valor_total'].apply(lambda x: f"R$ {float(x):,.2f}")
                 df_vendas['taxa_entrega'] = df_vendas.get('taxa_entrega', 0).apply(lambda x: f"R$ {float(x if x else 0):,.2f}")
+                df_vendas['tamanho'] = df_vendas.get('tamanho', 'N/A')
                 
                 # Renomear colunas
-                df_vendas = df_vendas[['data', 'produto', 'quantidade', 'valor_total', 'taxa_entrega']]
-                df_vendas.columns = ['Data', 'Produto', 'Qtd', 'Valor', 'Taxa Entrega']
+                df_vendas = df_vendas[['data', 'produto', 'tamanho', 'quantidade', 'valor_total', 'taxa_entrega']]
+                df_vendas.columns = ['Data', 'Produto', 'Tamanho', 'Qtd', 'Valor', 'Taxa Entrega']
                 
                 st.dataframe(df_vendas, use_container_width=True, hide_index=True)
                 
