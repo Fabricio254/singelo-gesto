@@ -223,12 +223,30 @@ def buscar_entregas(supabase: Client, limite: int = 50):
     result = supabase.table("singelo_entregas").select("*").order("data", desc=True).limit(limite).execute()
     return result.data
 
-def calcular_resumo(supabase: Client):
+def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
     """Calcula o resumo financeiro"""
     try:
-        compras = supabase.table("singelo_compras").select("valor_total").execute()
-        vendas = supabase.table("singelo_vendas").select("valor_total, taxa_entrega").execute()
-        entregas = supabase.table("singelo_entregas").select("custo_entregador").execute()
+        # Queries com filtro de data se fornecido
+        query_compras = supabase.table("singelo_compras").select("valor_total")
+        query_vendas = supabase.table("singelo_vendas").select("valor_total, taxa_entrega")
+        query_entregas = supabase.table("singelo_entregas").select("custo_entregador")
+        
+        if data_inicio:
+            query_compras = query_compras.gte("data", data_inicio.isoformat())
+            query_vendas = query_vendas.gte("data", data_inicio.isoformat())
+            query_entregas = query_entregas.gte("data", data_inicio.isoformat())
+        
+        if data_fim:
+            # Adicionar 1 dia para incluir o dia final completo
+            from datetime import timedelta
+            data_fim_ajustada = data_fim + timedelta(days=1)
+            query_compras = query_compras.lt("data", data_fim_ajustada.isoformat())
+            query_vendas = query_vendas.lt("data", data_fim_ajustada.isoformat())
+            query_entregas = query_entregas.lt("data", data_fim_ajustada.isoformat())
+        
+        compras = query_compras.execute()
+        vendas = query_vendas.execute()
+        entregas = query_entregas.execute()
         
         total_compras_material = sum([float(c['valor_total']) for c in compras.data]) if compras.data else 0
         total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
@@ -313,7 +331,55 @@ def main():
     if opcao == "📈 Dashboard":
         st.markdown("## 📈 Dashboard Financeiro")
         
-        resumo = calcular_resumo(supabase)
+        # Filtros de período
+        st.markdown("### 📅 Filtrar por Período")
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            data_inicio = st.date_input(
+                "Data Início",
+                value=None,
+                format="DD/MM/YYYY",
+                help="Deixe em branco para ver todos os dados",
+                key="data_inicio_dash"
+            )
+        
+        with col2:
+            data_fim = st.date_input(
+                "Data Fim",
+                value=None,
+                format="DD/MM/YYYY",
+                help="Deixe em branco para ver todos os dados",
+                key="data_fim_dash"
+            )
+        
+        with col3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔄 Limpar Filtros", key="limpar_filtros"):
+                st.rerun()
+        
+        # Converter None para None explicitamente
+        data_inicio_filtro = data_inicio if data_inicio else None
+        data_fim_filtro = data_fim if data_fim else None
+        
+        if data_inicio_filtro and data_fim_filtro and data_inicio_filtro > data_fim_filtro:
+            st.error("❌ A data de início deve ser anterior à data de fim!")
+            return
+        
+        # Mostrar período selecionado
+        if data_inicio_filtro or data_fim_filtro:
+            periodo_texto = "Período: "
+            if data_inicio_filtro:
+                periodo_texto += f"de {data_inicio_filtro.strftime('%d/%m/%Y')}"
+            if data_fim_filtro:
+                periodo_texto += f" até {data_fim_filtro.strftime('%d/%m/%Y')}"
+            st.info(f"📊 {periodo_texto}")
+        else:
+            st.info("📊 Mostrando todos os dados")
+        
+        st.markdown("---")
+        
+        resumo = calcular_resumo(supabase, data_inicio_filtro, data_fim_filtro)
         
         # Linha 1: Vendas e Compras
         col1, col2, col3 = st.columns(3)
