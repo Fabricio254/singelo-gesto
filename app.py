@@ -218,6 +218,11 @@ def buscar_vendas(supabase: Client, limite: int = 50):
     result = supabase.table("singelo_vendas").select("*").order("data", desc=True).limit(limite).execute()
     return result.data
 
+def buscar_entregas(supabase: Client, limite: int = 50):
+    """Busca os últimos custos de entrega"""
+    result = supabase.table("singelo_entregas").select("*").order("data", desc=True).limit(limite).execute()
+    return result.data
+
 def calcular_resumo(supabase: Client):
     """Calcula o resumo financeiro"""
     try:
