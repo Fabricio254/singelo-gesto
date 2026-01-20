@@ -737,15 +737,20 @@ def buscar_entregas(supabase: Client, limite: int = 50):
     return result.data
 
 def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
-    """Calcula o resumo financeiro usando parcelas por vencimento e entregas por data"""
+    """Calcula o resumo financeiro usando parcelas por vencimento e custos automáticos por data"""
     try:
-        # Buscar PARCELAS do período (por data de vencimento)
-        query_parcelas = supabase.table("singelo_parcelas_compras").select("valor_parcela, data_vencimento")
+        # Buscar PARCELAS do período (por data de vencimento) - exceto custos automáticos
+        query_parcelas = supabase.table("singelo_parcelas_compras").select("valor_parcela, data_vencimento, compra_id")
+        
+        # Buscar CUSTOS AUTOMÁTICOS pelo período da compra (data da venda)
+        query_custos_auto = supabase.table("singelo_compras").select("valor_total, data, descricao").like("descricao", "Custo automático:%")
+        
         query_vendas = supabase.table("singelo_vendas").select("valor_total, taxa_entrega")
         query_entregas = supabase.table("singelo_entregas").select("custo_entregador")
         
         if data_inicio:
             query_parcelas = query_parcelas.gte("data_vencimento", data_inicio.isoformat())
+            query_custos_auto = query_custos_auto.gte("data", data_inicio.isoformat())
             query_vendas = query_vendas.gte("data", data_inicio.isoformat())
             query_entregas = query_entregas.gte("data", data_inicio.isoformat())
         
@@ -754,19 +759,31 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             from datetime import timedelta
             data_fim_final = datetime.combine(data_fim, datetime.max.time())
             query_parcelas = query_parcelas.lte("data_vencimento", data_fim_final.isoformat())
+            query_custos_auto = query_custos_auto.lte("data", data_fim_final.isoformat())
             query_vendas = query_vendas.lte("data", data_fim_final.isoformat())
             query_entregas = query_entregas.lte("data", data_fim_final.isoformat())
         
         parcelas = query_parcelas.execute()
+        custos_auto = query_custos_auto.execute()
         vendas = query_vendas.execute()
         entregas = query_entregas.execute()
         
-        # Calcular total de parcelas (compras de material parceladas)
-        total_compras_material = sum([float(p['valor_parcela']) for p in parcelas.data]) if parcelas.data else 0
+        # Pegar IDs das compras de custos automáticos para não duplicar
+        ids_custos_auto = [c['id'] for c in custos_auto.data] if custos_auto.data else []
+        
+        # Filtrar parcelas que NÃO são de custos automáticos
+        parcelas_normais = [p for p in parcelas.data if p['compra_id'] not in ids_custos_auto] if parcelas.data else []
+        
+        # Calcular total de parcelas normais (compras de material parceladas)
+        total_parcelas_normais = sum([float(p['valor_parcela']) for p in parcelas_normais])
+        
+        # Calcular total de custos automáticos (valor total, não parcela)
+        total_custos_auto = sum([float(c['valor_total']) for c in custos_auto.data]) if custos_auto.data else 0
+        
+        # Total de compras = parcelas normais + custos automáticos
+        total_compras = total_parcelas_normais + total_custos_auto
         
         total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
-        # Total de compras = parcelas de material + custo pago aos entregadores
-        total_compras = total_compras_material + total_custo_entregador
         
         # Total de vendas = valor da venda + taxa de entrega cobrada do cliente
         total_vendas = sum([float(v['valor_total']) + float(v.get('taxa_entrega', 0)) for v in vendas.data]) if vendas.data else 0
