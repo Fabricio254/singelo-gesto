@@ -443,10 +443,13 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
     
     # Criar parcelas com vencimento sempre no dia 12
     if num_parcelas > 1:
+        # Se a compra foi feita após o dia 12, começar no próximo mês
+        meses_adicionar = 1 if data_base.day > 12 else 0
+        
         valor_parcela = valor_total / num_parcelas
         for i in range(num_parcelas):
-            # Adicionar i meses à data base
-            mes_vencimento = data_base.month + i
+            # Adicionar i meses à data base (+ ajuste se comprou após dia 12)
+            mes_vencimento = data_base.month + i + meses_adicionar
             ano_vencimento = data_base.year
             
             # Ajustar ano se passar de dezembro
@@ -474,13 +477,21 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
             }
             supabase.table("singelo_parcelas_compras").insert(parcela_data).execute()
     else:
-        # Compra à vista - criar uma única parcela com vencimento no dia 12 do mês atual
+        # Compra à vista - criar uma única parcela com vencimento no dia 12
+        # Se a compra foi após o dia 12, vencimento vai para o próximo mês
+        mes_vencimento = data_base.month + (1 if data_base.day > 12 else 0)
+        ano_vencimento = data_base.year
+        
+        if mes_vencimento > 12:
+            mes_vencimento = 1
+            ano_vencimento += 1
+        
         try:
-            data_vencimento = datetime(data_base.year, data_base.month, 12)
+            data_vencimento = datetime(ano_vencimento, mes_vencimento, 12)
         except ValueError:
             from calendar import monthrange
-            ultimo_dia = monthrange(data_base.year, data_base.month)[1]
-            data_vencimento = datetime(data_base.year, data_base.month, min(12, ultimo_dia))
+            ultimo_dia = monthrange(ano_vencimento, mes_vencimento)[1]
+            data_vencimento = datetime(ano_vencimento, mes_vencimento, min(12, ultimo_dia))
         
         parcela_data = {
             "compra_id": compra_id,
@@ -674,10 +685,13 @@ def recalcular_parcelas(supabase: Client, compra_id: int, novo_valor_total: floa
     supabase.table("singelo_parcelas_compras").delete().eq("compra_id", compra_id).execute()
     
     # Criar novas parcelas com vencimento sempre no dia 12
+    # Se a compra foi feita após o dia 12, começar no próximo mês
+    meses_adicionar = 1 if data_compra.day > 12 else 0
+    
     valor_parcela = novo_valor_total / novo_num_parcelas
     for i in range(novo_num_parcelas):
-        # Adicionar i meses à data base
-        mes_vencimento = data_compra.month + i
+        # Adicionar i meses à data base (+ ajuste se comprou após dia 12)
+        mes_vencimento = data_compra.month + i + meses_adicionar
         ano_vencimento = data_compra.year
         
         # Ajustar ano se passar de dezembro
@@ -989,7 +1003,7 @@ def main():
         st.markdown("## 🛒 Lançar Nova Compra")
         
         # Tabs para escolher entre manual, XML e chave de acesso
-        tab1, tab2, tab3 = st.tabs(["✍️ Digitar Manualmente", "📄 Importar XML", "🔑 Buscar por Chave"])
+        tab1, tab2, tab3 = st.tabs(["✍então a logica é o seguinte, ️ Digitar Manualmente", "📄 Importar XML", "🔑 Buscar por Chave"])
         
         with tab1:
             with st.form("form_compra"):
