@@ -183,13 +183,31 @@ def buscar_xml_por_chave(chave_acesso):
         
         # Montar URL da SEFAZ (exemplo para SP)
         # Nota: Cada estado tem sua própria URL e pode requerer autenticação
-        if uf == 'SP':
-            url = f"https://www.nfe.fazenda.sp.gov.br/NFeConsultaPublica/Documento.aspx?chNFe={chave_acesso}"
+        if uf == 'ES':
+            url = f"https://app.sefaz.es.gov.br/ConsultaNFCe/qrcode.aspx"
+            return {
+                "sucesso": True,
+                "mensagem": f"✅ Link da SEFAZ-ES gerado! Acesse para baixar o XML",
+                "url": url,
+                "chave": chave_acesso,
+                "uf": uf,
+                "instrucoes": f"1. Clique no link abaixo\n2. Digite a chave no campo indicado\n3. Clique em 'Consultar'\n4. Baixe o XML na página que abrir"
+            }
+        elif uf == 'SP':
+            url = f"https://www.nfe.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx"
+            return {
+                "sucesso": True,
+                "mensagem": f"✅ Link da SEFAZ-SP gerado! Acesse para baixar o XML",
+                "url": url,
+                "chave": chave_acesso,
+                "uf": uf,
+                "instrucoes": f"1. Clique no link abaixo\n2. Digite a chave no campo indicado\n3. Clique em 'Consultar'\n4. Baixe o XML na página que abrir"
+            }
         else:
             # Para outros estados, retornar link genérico
             return {
                 "sucesso": False,
-                "mensagem": f"Download automático não disponível para {uf}. Use o QR Code ou acesse manualmente o site da SEFAZ-{uf}",
+                "mensagem": f"Para {uf}, use o QR Code do cupom ou acesse o site da SEFAZ-{uf}",
                 "url": None,
                 "chave": chave_acesso,
                 "uf": uf
@@ -748,6 +766,25 @@ def main():
                     
                     if resultado.get('sucesso'):
                         st.success(resultado['mensagem'])
+                        
+                        # Mostrar informações
+                        st.markdown(f"**🗺️ Estado:** {resultado['uf']}")
+                        st.markdown(f"**🔑 Chave:** {resultado['chave']}")
+                        
+                        # Mostrar instruções
+                        if 'instrucoes' in resultado:
+                            st.info(f"📋 **Instruções:**\n\n{resultado['instrucoes']}")
+                        
+                        # Botão para acessar SEFAZ
+                        if 'url' in resultado and resultado['url']:
+                            st.markdown("---")
+                            st.markdown(f"### 🔗 [Clique aqui para acessar a SEFAZ-{resultado['uf']}]({resultado['url']})")
+                            st.markdown(f"**Cole esta chave lá:** `{resultado['chave']}`")
+                            
+                            # Botão de copiar
+                            if st.button("📋 Copiar Chave", key="copiar_chave"):
+                                st.code(resultado['chave'], language=None)
+                                st.success("✅ Chave copiada! Cole na página da SEFAZ")
                     else:
                         st.warning(resultado['mensagem'])
                         
