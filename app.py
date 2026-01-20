@@ -1232,6 +1232,25 @@ def main():
         # Buscar parcelas do período
         parcelas = buscar_parcelas_pendentes(supabase, datetime.combine(data_inicio, datetime.min.time()), datetime.combine(data_fim, datetime.max.time()))
         
+        # Marcar automaticamente como paga as parcelas vencidas (compras de cartão)
+        parcelas_marcadas = 0
+        if parcelas:
+            for parcela in parcelas:
+                if parcela['status'] == 'pendente':
+                    data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
+                    # Se vencimento já passou, marcar como paga automaticamente
+                    if data_venc.date() < datetime.now().date():
+                        try:
+                            marcar_parcela_paga(supabase, parcela['id'])
+                            parcelas_marcadas += 1
+                        except:
+                            pass
+            
+            # Se marcou alguma parcela, recarregar dados
+            if parcelas_marcadas > 0:
+                st.success(f"✅ {parcelas_marcadas} parcela(s) vencida(s) marcada(s) como paga(s) automaticamente")
+                parcelas = buscar_parcelas_pendentes(supabase, datetime.combine(data_inicio, datetime.min.time()), datetime.combine(data_fim, datetime.max.time()))
+        
         if parcelas:
             # Separar em pagas e pendentes
             parcelas_pendentes = [p for p in parcelas if p['status'] == 'pendente']
@@ -1284,11 +1303,8 @@ def main():
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
                         dias_para_vencer = (data_venc.date() - datetime.now().date()).days
                         
-                        # Determinar cor baseado em dias para vencer
-                        if dias_para_vencer < 0:
-                            cor_status = "🔴 Atrasada"
-                            estilo_extra = "border-left: 4px solid #E74C3C;"
-                        elif dias_para_vencer <= 7:
+                        # Determinar cor baseado em dias para vencer (atrasadas já são marcadas como pagas automaticamente)
+                        if dias_para_vencer <= 7:
                             cor_status = "🟡 Vence em breve"
                             estilo_extra = "border-left: 4px solid #F39C12;"
                         else:
