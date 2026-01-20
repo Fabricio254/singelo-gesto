@@ -1244,9 +1244,11 @@ def main():
             logradouro = st.text_input(
                 "🏠 Rua/Avenida",
                 value=st.session_state.endereco_logradouro,
-                placeholder="Ex: Rua das Flores",
-                key="logradouro"
+                placeholder="Ex: Rua das Flores"
             )
+            # Atualizar session_state se usuário editou
+            if logradouro != st.session_state.endereco_logradouro:
+                st.session_state.endereco_logradouro = logradouro
         
         with col2:
             numero = st.text_input(
@@ -1261,9 +1263,11 @@ def main():
             bairro = st.text_input(
                 "🏘️ Bairro",
                 value=st.session_state.endereco_bairro,
-                placeholder="Ex: Centro",
-                key="bairro"
+                placeholder="Ex: Centro"
             )
+            # Atualizar session_state se usuário editou
+            if bairro != st.session_state.endereco_bairro:
+                st.session_state.endereco_bairro = bairro
         
         with col2:
             complemento = st.text_input(
@@ -1278,18 +1282,22 @@ def main():
             cidade = st.text_input(
                 "🌆 Cidade",
                 value=st.session_state.endereco_cidade,
-                placeholder="Ex: São Paulo",
-                key="cidade"
+                placeholder="Ex: São Paulo"
             )
+            # Atualizar session_state se usuário editou
+            if cidade != st.session_state.endereco_cidade:
+                st.session_state.endereco_cidade = cidade
         
         with col2:
             uf = st.text_input(
                 "🗺️ Estado (UF)",
                 value=st.session_state.endereco_uf,
                 max_chars=2,
-                placeholder="SP",
-                key="uf"
+                placeholder="SP"
             )
+            # Atualizar session_state se usuário editou
+            if uf != st.session_state.endereco_uf:
+                st.session_state.endereco_uf = uf
         
         st.markdown("---")
         
