@@ -1194,7 +1194,7 @@ def main():
             st.session_state.ultimo_cep = ''
         
         # Campo de data de entrega
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns([2, 2, 1])
         with col1:
             data_entrega = st.date_input(
                 "📅 Data de Entrega",
@@ -1209,26 +1209,33 @@ def main():
                 "📮 CEP",
                 max_chars=9,
                 placeholder="00000-000",
-                help="Digite o CEP (8 dígitos) para buscar automaticamente",
+                help="Digite o CEP (8 dígitos)",
                 key="cep_input"
             )
         
-        # Buscar CEP automaticamente quando digitado
-        cep_limpo = ''.join(filter(str.isdigit, cep_input))
-        if cep_limpo and len(cep_limpo) == 8 and cep_limpo != st.session_state.ultimo_cep:
-            with st.spinner("🔍 Buscando endereço..."):
-                endereco_encontrado = buscar_cep(cep_input)
-                if endereco_encontrado['sucesso']:
-                    # Atualizar session_state com os dados encontrados
-                    st.session_state.endereco_logradouro = endereco_encontrado.get('logradouro', '')
-                    st.session_state.endereco_bairro = endereco_encontrado.get('bairro', '')
-                    st.session_state.endereco_cidade = endereco_encontrado.get('cidade', '')
-                    st.session_state.endereco_uf = endereco_encontrado.get('uf', '')
-                    st.session_state.ultimo_cep = cep_limpo
-                    st.success(f"✅ Endereço encontrado: {endereco_encontrado['logradouro']}, {endereco_encontrado['bairro']} - {endereco_encontrado['cidade']}/{endereco_encontrado['uf']}")
-                    st.rerun()
-                else:
-                    st.warning(f"⚠️ {endereco_encontrado['mensagem']}")
+        with col3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            buscar_cep_btn = st.button("🔍 Buscar", use_container_width=True, key="btn_buscar_cep")
+        
+        # Buscar CEP quando clicar no botão
+        if buscar_cep_btn:
+            cep_limpo = ''.join(filter(str.isdigit, cep_input))
+            if cep_limpo and len(cep_limpo) == 8:
+                with st.spinner("🔍 Buscando endereço..."):
+                    endereco_encontrado = buscar_cep(cep_input)
+                    if endereco_encontrado['sucesso']:
+                        # Atualizar session_state com os dados encontrados
+                        st.session_state.endereco_logradouro = endereco_encontrado.get('logradouro', '')
+                        st.session_state.endereco_bairro = endereco_encontrado.get('bairro', '')
+                        st.session_state.endereco_cidade = endereco_encontrado.get('cidade', '')
+                        st.session_state.endereco_uf = endereco_encontrado.get('uf', '')
+                        st.session_state.ultimo_cep = cep_limpo
+                        st.success(f"✅ Endereço encontrado: {endereco_encontrado['logradouro']}, {endereco_encontrado['bairro']} - {endereco_encontrado['cidade']}/{endereco_encontrado['uf']}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {endereco_encontrado['mensagem']}")
+            else:
+                st.warning("⚠️ Digite um CEP válido com 8 dígitos")
         
         # Campos de endereço (editáveis, preenchidos automaticamente)
         col1, col2 = st.columns([3, 1])
