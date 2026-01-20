@@ -737,10 +737,10 @@ def buscar_entregas(supabase: Client, limite: int = 50):
     return result.data
 
 def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
-    """Calcula o resumo financeiro usando parcelas"""
+    """Calcula o resumo financeiro usando parcelas por vencimento e entregas por data"""
     try:
-        # Buscar parcelas do período (ao invés de compras totais)
-        query_parcelas = supabase.table("singelo_parcelas_compras").select("valor_parcela, status")
+        # Buscar PARCELAS do período (por data de vencimento)
+        query_parcelas = supabase.table("singelo_parcelas_compras").select("valor_parcela, data_vencimento")
         query_vendas = supabase.table("singelo_vendas").select("valor_total, taxa_entrega")
         query_entregas = supabase.table("singelo_entregas").select("custo_entregador")
         
@@ -761,13 +761,11 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
         vendas = query_vendas.execute()
         entregas = query_entregas.execute()
         
-        # Calcular total de parcelas (apenas pendentes para projeção)
+        # Calcular total de parcelas (compras de material parceladas)
         total_compras_material = sum([float(p['valor_parcela']) for p in parcelas.data]) if parcelas.data else 0
-        parcelas_pagas = sum([float(p['valor_parcela']) for p in parcelas.data if p['status'] == 'pago']) if parcelas.data else 0
-        parcelas_pendentes = sum([float(p['valor_parcela']) for p in parcelas.data if p['status'] == 'pendente']) if parcelas.data else 0
         
         total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
-        # Total de compras = parcelas do período + custo pago aos entregadores
+        # Total de compras = parcelas de material + custo pago aos entregadores
         total_compras = total_compras_material + total_custo_entregador
         
         # Total de vendas = valor da venda + taxa de entrega cobrada do cliente
@@ -783,9 +781,7 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             "total_taxa_entrega_cobrada": total_taxa_entrega_cobrada,
             "total_custo_entregador": total_custo_entregador,
             "lucro_entregas": lucro_entregas,
-            "lucro": lucro,
-            "parcelas_pagas": parcelas_pagas,
-            "parcelas_pendentes": parcelas_pendentes
+            "lucro": lucro
         }
     except Exception as e:
         return {
@@ -794,9 +790,7 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             "total_taxa_entrega_cobrada": 0,
             "total_custo_entregador": 0,
             "lucro_entregas": 0,
-            "lucro": 0,
-            "parcelas_pagas": 0,
-            "parcelas_pendentes": 0
+            "lucro": 0
         }
 
 # ==================== INTERFACE PRINCIPAL ====================
@@ -856,21 +850,33 @@ def main():
         st.markdown("### 📅 Filtrar por Período")
         col1, col2, col3 = st.columns([2, 2, 1])
         
+        # Data padrão: dia 12 do mês atual até dia 12 do próximo mês
+        hoje = datetime.now()
+        data_inicio_padrao = datetime(hoje.year, hoje.month, 12)
+        
+        # Calcular dia 12 do próximo mês
+        mes_fim = hoje.month + 1
+        ano_fim = hoje.year
+        if mes_fim > 12:
+            mes_fim = 1
+            ano_fim += 1
+        data_fim_padrao = datetime(ano_fim, mes_fim, 12)
+        
         with col1:
             data_inicio = st.date_input(
                 "Data Início",
-                value=None,
+                value=data_inicio_padrao,
                 format="DD/MM/YYYY",
-                help="Deixe em branco para ver todos os dados",
+                help="Data de início do período (padrão: dia 12 do mês atual)",
                 key="data_inicio_dash"
             )
         
         with col2:
             data_fim = st.date_input(
                 "Data Fim",
-                value=None,
+                value=data_fim_padrao,
                 format="DD/MM/YYYY",
-                help="Deixe em branco para ver todos os dados",
+                help="Data de fim do período (padrão: dia 12 do próximo mês)",
                 key="data_fim_dash"
             )
         
