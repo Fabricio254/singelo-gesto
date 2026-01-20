@@ -429,14 +429,86 @@ def extrair_dados_xml_nfe(xml_content):
             "mensagem": f"Erro ao ler XML: {str(e)}"
         }
 
-def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", data_compra=None):
-    """Insere uma nova compra no banco"""
+def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", data_compra=None, num_parcelas: int = 1):
+    """Insere uma nova compra no banco e cria as parcelas"""
+    data_base = data_compra if data_compra else datetime.now()
+    
     data = {
-        "data": data_compra.isoformat() if data_compra else datetime.now().isoformat(),
+        "data": data_base.isoformat(),
         "valor_total": valor_total,
         "descricao": descricao
     }
     result = supabase.table("singelo_compras").insert(data).execute()
+    compra_id = result.data[0]['id']
+    
+    # Criar parcelas
+    if num_parcelas > 1:
+        valor_parcela = valor_total / num_parcelas
+        for i in range(num_parcelas):
+            # Adicionar i meses à data base
+            mes_vencimento = data_base.month + i
+            ano_vencimento = data_base.year
+            
+            # Ajustar ano se passar de dezembro
+            while mes_vencimento > 12:
+                mes_vencimento -= 12
+                ano_vencimento += 1
+            
+            data_vencimento = data_base.replace(year=ano_vencimento, month=mes_vencimento)
+            
+            parcela_data = {
+                "compra_id": compra_id,
+                "numero_parcela": i + 1,
+                "total_parcelas": num_parcelas,
+                "valor_parcela": valor_parcela,
+                "data_vencimento": data_vencimento.isoformat(),
+                "status": "pendente",
+                "descricao": descricao
+            }
+            supabase.table("singelo_parcelas_compras").insert(parcela_data).execute()
+    else:
+        # Compra à vista - criar uma única parcela
+        parcela_data = {
+            "compra_id": compra_id,
+            "numero_parcela": 1,
+            "total_parcelas": 1,
+            "valor_parcela": valor_total,
+            "data_vencimento": data_base.isoformat(),
+            "status": "pendente",
+            "descricao": descricao
+        }
+        supabase.table("singelo_parcelas_compras").insert(parcela_data).execute()
+    
+    return result
+
+def buscar_parcelas_pendentes(supabase: Client, data_inicio=None, data_fim=None):
+    """Busca parcelas pendentes no período"""
+    query = supabase.table("singelo_parcelas_compras").select("*")
+    
+    if data_inicio:
+        query = query.gte("data_vencimento", data_inicio.isoformat())
+    if data_fim:
+        query = query.lte("data_vencimento", data_fim.isoformat())
+    
+    result = query.order("data_vencimento", desc=False).execute()
+    return result.data
+
+def marcar_parcela_paga(supabase: Client, parcela_id: int):
+    """Marca uma parcela como paga"""
+    data = {
+        "status": "pago",
+        "data_pagamento": datetime.now().isoformat()
+    }
+    result = supabase.table("singelo_parcelas_compras").update(data).eq("id", parcela_id).execute()
+    return result
+
+def marcar_parcela_pendente(supabase: Client, parcela_id: int):
+    """Marca uma parcela como pendente"""
+    data = {
+        "status": "pendente",
+        "data_pagamento": None
+    }
+    result = supabase.table("singelo_parcelas_compras").update(data).eq("id", parcela_id).execute()
     return result
 
 def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: float, taxa_entrega: float = 0, tamanho: str = ""):
@@ -498,15 +570,15 @@ def buscar_entregas(supabase: Client, limite: int = 50):
     return result.data
 
 def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
-    """Calcula o resumo financeiro"""
+    """Calcula o resumo financeiro usando parcelas"""
     try:
-        # Queries com filtro de data se fornecido
-        query_compras = supabase.table("singelo_compras").select("valor_total")
+        # Buscar parcelas do período (ao invés de compras totais)
+        query_parcelas = supabase.table("singelo_parcelas_compras").select("valor_parcela, status")
         query_vendas = supabase.table("singelo_vendas").select("valor_total, taxa_entrega")
         query_entregas = supabase.table("singelo_entregas").select("custo_entregador")
         
         if data_inicio:
-            query_compras = query_compras.gte("data", data_inicio.isoformat())
+            query_parcelas = query_parcelas.gte("data_vencimento", data_inicio.isoformat())
             query_vendas = query_vendas.gte("data", data_inicio.isoformat())
             query_entregas = query_entregas.gte("data", data_inicio.isoformat())
         
@@ -514,17 +586,21 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             # Adicionar 1 dia para incluir o dia final completo
             from datetime import timedelta
             data_fim_ajustada = data_fim + timedelta(days=1)
-            query_compras = query_compras.lt("data", data_fim_ajustada.isoformat())
+            query_parcelas = query_parcelas.lt("data_vencimento", data_fim_ajustada.isoformat())
             query_vendas = query_vendas.lt("data", data_fim_ajustada.isoformat())
             query_entregas = query_entregas.lt("data", data_fim_ajustada.isoformat())
         
-        compras = query_compras.execute()
+        parcelas = query_parcelas.execute()
         vendas = query_vendas.execute()
         entregas = query_entregas.execute()
         
-        total_compras_material = sum([float(c['valor_total']) for c in compras.data]) if compras.data else 0
+        # Calcular total de parcelas (apenas pendentes para projeção)
+        total_compras_material = sum([float(p['valor_parcela']) for p in parcelas.data]) if parcelas.data else 0
+        parcelas_pagas = sum([float(p['valor_parcela']) for p in parcelas.data if p['status'] == 'pago']) if parcelas.data else 0
+        parcelas_pendentes = sum([float(p['valor_parcela']) for p in parcelas.data if p['status'] == 'pendente']) if parcelas.data else 0
+        
         total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
-        # Total de compras = compras de material + custo pago aos entregadores
+        # Total de compras = parcelas do período + custo pago aos entregadores
         total_compras = total_compras_material + total_custo_entregador
         
         # Total de vendas = valor da venda + taxa de entrega cobrada do cliente
@@ -540,7 +616,9 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             "total_taxa_entrega_cobrada": total_taxa_entrega_cobrada,
             "total_custo_entregador": total_custo_entregador,
             "lucro_entregas": lucro_entregas,
-            "lucro": lucro
+            "lucro": lucro,
+            "parcelas_pagas": parcelas_pagas,
+            "parcelas_pendentes": parcelas_pendentes
         }
     except Exception as e:
         return {
@@ -549,7 +627,9 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             "total_taxa_entrega_cobrada": 0,
             "total_custo_entregador": 0,
             "lucro_entregas": 0,
-            "lucro": 0
+            "lucro": 0,
+            "parcelas_pagas": 0,
+            "parcelas_pendentes": 0
         }
 
 # ==================== INTERFACE PRINCIPAL ====================
@@ -592,7 +672,7 @@ def main():
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
             "Selecione uma opção:",
-            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "📋 Histórico"],
+            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "� Contas a Pagar", "�📋 Histórico"],
             label_visibility="collapsed"
         )
         
@@ -775,16 +855,29 @@ def main():
                     placeholder="Ex: Compra de materiais, embalagens, ingredientes..."
                 )
                 
+                num_parcelas = st.selectbox(
+                    "💳 Número de Parcelas",
+                    options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                    format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                    help="Selecione em quantas parcelas a compra será dividida"
+                )
+                
+                # Mostrar valor das parcelas
+                if num_parcelas > 1:
+                    valor_parcela = valor / num_parcelas
+                    st.info(f"💰 Valor de cada parcela: R$ {valor_parcela:,.2f}")
+                
                 submitted = st.form_submit_button("✅ Registrar Compra", use_container_width=True)
             
             if submitted:
                 if valor > 0:
                     try:
-                        inserir_compra(supabase, valor, descricao)
+                        inserir_compra(supabase, valor, descricao, num_parcelas=num_parcelas)
+                        parcelas_info = f"{num_parcelas}x de R$ {valor/num_parcelas:,.2f}" if num_parcelas > 1 else "à vista"
                         st.markdown(f"""
                             <div class='success-message'>
                                 ✅ <strong>Compra registrada com sucesso!</strong><br>
-                                Valor: R$ {valor:,.2f}
+                                Valor: R$ {valor:,.2f} ({parcelas_info})
                             </div>
                         """, unsafe_allow_html=True)
                         st.balloons()
@@ -859,15 +952,29 @@ def main():
                         
                         st.markdown("---")
                         
+                        # Campo para selecionar parcelas
+                        num_parcelas_xml = st.selectbox(
+                            "💳 Número de Parcelas",
+                            options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                            format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                            help="Selecione em quantas parcelas a compra será dividida",
+                            key="parcelas_xml"
+                        )
+                        
+                        if num_parcelas_xml > 1:
+                            valor_parcela = dados['valor_total'] / num_parcelas_xml
+                            st.info(f"💰 Valor de cada parcela: R$ {valor_parcela:,.2f}")
+                        
                         # Botão para confirmar importação
                         if st.button("✅ Confirmar e Registrar Compra", use_container_width=True, type="primary", key="btn_confirmar_xml"):
                             try:
-                                inserir_compra(supabase, dados['valor_total'], dados['descricao'], dados['data'])
+                                inserir_compra(supabase, dados['valor_total'], dados['descricao'], dados['data'], num_parcelas_xml)
+                                parcelas_info = f"{num_parcelas_xml}x de R$ {dados['valor_total']/num_parcelas_xml:,.2f}" if num_parcelas_xml > 1 else "à vista"
                                 st.markdown(f"""
                                     <div class='success-message'>
                                         ✅ <strong>Compra importada e registrada com sucesso!</strong><br>
                                         Fornecedor: {dados['descricao']}<br>
-                                        Valor: R$ {dados['valor_total']:,.2f}<br>
+                                        Valor: R$ {dados['valor_total']:,.2f} ({parcelas_info})<br>
                                         Data: {dados['data'].strftime('%d/%m/%Y %H:%M')}
                                     </div>
                                 """, unsafe_allow_html=True)
@@ -1090,6 +1197,164 @@ def main():
                     st.error(f"❌ Erro ao registrar custo: {str(e)}")
             else:
                 st.warning("⚠️ O valor deve ser maior que zero")
+    
+    # ==================== CONTAS A PAGAR ====================
+    elif opcao == "💳 Contas a Pagar":
+        st.markdown("## 💳 Controle de Contas a Pagar")
+        
+        # Filtros de período
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            data_inicio = st.date_input(
+                "📅 Data Início",
+                value=datetime.now().replace(day=1),
+                help="Selecione a data inicial do período"
+            )
+        
+        with col2:
+            # Último dia do mês atual
+            from calendar import monthrange
+            ultimo_dia = monthrange(datetime.now().year, datetime.now().month)[1]
+            data_fim = st.date_input(
+                "📅 Data Fim",
+                value=datetime.now().replace(day=ultimo_dia),
+                help="Selecione a data final do período"
+            )
+        
+        with col3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔍 Filtrar", use_container_width=True):
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Buscar parcelas do período
+        parcelas = buscar_parcelas_pendentes(supabase, datetime.combine(data_inicio, datetime.min.time()), datetime.combine(data_fim, datetime.max.time()))
+        
+        if parcelas:
+            # Separar em pagas e pendentes
+            parcelas_pendentes = [p for p in parcelas if p['status'] == 'pendente']
+            parcelas_pagas = [p for p in parcelas if p['status'] == 'pago']
+            
+            # Resumo
+            total_pendente = sum([float(p['valor_parcela']) for p in parcelas_pendentes])
+            total_pago = sum([float(p['valor_parcela']) for p in parcelas_pagas])
+            total_geral = total_pendente + total_pago
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown(f"""
+                    <div class='metric-card' style='background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);'>
+                        <h3>⏰ Pendente</h3>
+                        <h2>R$ {total_pendente:,.2f}</h2>
+                        <p>{len(parcelas_pendentes)} parcela(s)</p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                    <div class='metric-card' style='background: linear-gradient(135deg, #28A745 0%, #218838 100%);'>
+                        <h3>✅ Pago</h3>
+                        <h2>R$ {total_pago:,.2f}</h2>
+                        <p>{len(parcelas_pagas)} parcela(s)</p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                    <div class='metric-card' style='background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%);'>
+                        <h3>📊 Total</h3>
+                        <h2>R$ {total_geral:,.2f}</h2>
+                        <p>{len(parcelas)} parcela(s)</p>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # Tabs para separar pendentes e pagas
+            tab1, tab2 = st.tabs([f"⏰ Pendentes ({len(parcelas_pendentes)})", f"✅ Pagas ({len(parcelas_pagas)})"])
+            
+            with tab1:
+                st.markdown("### ⏰ Parcelas Pendentes")
+                
+                if parcelas_pendentes:
+                    for parcela in parcelas_pendentes:
+                        data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
+                        dias_para_vencer = (data_venc.date() - datetime.now().date()).days
+                        
+                        # Determinar cor baseado em dias para vencer
+                        if dias_para_vencer < 0:
+                            cor_status = "🔴 Atrasada"
+                            estilo_extra = "border-left: 4px solid #E74C3C;"
+                        elif dias_para_vencer <= 7:
+                            cor_status = "🟡 Vence em breve"
+                            estilo_extra = "border-left: 4px solid #F39C12;"
+                        else:
+                            cor_status = "🟢 No prazo"
+                            estilo_extra = "border-left: 4px solid #28A745;"
+                        
+                        col1, col2 = st.columns([4, 1])
+                        
+                        with col1:
+                            st.markdown(f"""
+                                <div class='box-card' style='{estilo_extra}'>
+                                    <strong>{cor_status}</strong><br>
+                                    📅 Vencimento: {data_venc.strftime('%d/%m/%Y')}<br>
+                                    💵 Valor: R$ {float(parcela['valor_parcela']):,.2f}<br>
+                                    📦 Parcela: {parcela['numero_parcela']}/{parcela['total_parcelas']}<br>
+                                    {f"📝 {parcela.get('descricao', '')}" if parcela.get('descricao') else ""}
+                                </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col2:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if st.button("✅ Marcar como Paga", key=f"pagar_{parcela['id']}", use_container_width=True):
+                                try:
+                                    marcar_parcela_paga(supabase, parcela['id'])
+                                    st.success("Parcela marcada como paga!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro: {str(e)}")
+                else:
+                    st.info("✅ Nenhuma parcela pendente no período selecionado")
+            
+            with tab2:
+                st.markdown("### ✅ Parcelas Pagas")
+                
+                if parcelas_pagas:
+                    for parcela in parcelas_pagas:
+                        data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
+                        data_pag = datetime.fromisoformat(parcela['data_pagamento'].replace('Z', '+00:00')) if parcela.get('data_pagamento') else None
+                        
+                        col1, col2 = st.columns([4, 1])
+                        
+                        with col1:
+                            st.markdown(f"""
+                                <div class='box-card' style='border-left: 4px solid #28A745;'>
+                                    <strong>✅ Paga</strong><br>
+                                    📅 Vencimento: {data_venc.strftime('%d/%m/%Y')}<br>
+                                    💵 Valor: R$ {float(parcela['valor_parcela']):,.2f}<br>
+                                    📦 Parcela: {parcela['numero_parcela']}/{parcela['total_parcelas']}<br>
+                                    {f"💳 Pago em: {data_pag.strftime('%d/%m/%Y %H:%M')}" if data_pag else ""}<br>
+                                    {f"📝 {parcela.get('descricao', '')}" if parcela.get('descricao') else ""}
+                                </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col2:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if st.button("↩️ Desfazer", key=f"desfazer_{parcela['id']}", use_container_width=True):
+                                try:
+                                    marcar_parcela_pendente(supabase, parcela['id'])
+                                    st.success("Status alterado para pendente!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro: {str(e)}")
+                else:
+                    st.info("Nenhuma parcela paga no período selecionado")
+        else:
+            st.info("Nenhuma conta a pagar encontrada no período selecionado")
     
     # ==================== HISTÓRICO ====================
     elif opcao == "📋 Histórico":
