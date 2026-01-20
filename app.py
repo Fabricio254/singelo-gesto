@@ -1513,6 +1513,7 @@ def main():
             data_inicio = st.date_input(
                 "📅 Data Início",
                 value=datetime.now().replace(day=1),
+                format="DD/MM/YYYY",
                 help="Selecione a data inicial do período"
             )
         
@@ -1523,6 +1524,7 @@ def main():
             data_fim = st.date_input(
                 "📅 Data Fim",
                 value=datetime.now().replace(day=ultimo_dia),
+                format="DD/MM/YYYY",
                 help="Selecione a data final do período"
             )
         
