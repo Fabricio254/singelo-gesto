@@ -262,14 +262,18 @@ def extrair_dados_html_nfce(html_content):
         
         numero_nf = match_numero.group(1) if match_numero else ""
         
-        # Extrair itens
+        # Extrair itens - tentar múltiplos padrões
         itens = []
-        pattern_itens = r'<span class="txtTit">(.*?)</span>.*?<strong>Qtde\.:(\d+)</strong>.*?<strong>Vl\. Unit\.:</strong> ([\d,]+)</span>.*?<span class="valor">([\d,]+)</span>'
-        matches = re.finditer(pattern_itens, html_content, re.DOTALL)
+        
+        # Padrão 1: formato padrão com txtTit
+        pattern1 = r'<span class="txtTit">(.*?)</span>.*?<strong>Qtde\.?:\s*(\d+(?:,\d+)?)</strong>.*?<strong>Vl\.\s*Unit\.?:</strong>\s*([\d,]+)</span>.*?<span class="valor">([\d,]+)</span>'
+        matches = re.finditer(pattern1, html_content, re.DOTALL)
         
         for match in matches:
             nome_prod = match.group(1).strip()
-            qtd = float(match.group(2))
+            # Limpar tags HTML do nome do produto
+            nome_prod = re.sub(r'<[^>]+>', '', nome_prod)
+            qtd = float(match.group(2).replace(',', '.'))
             valor_unit = float(match.group(3).replace(',', '.'))
             valor_item = float(match.group(4).replace(',', '.'))
             
@@ -279,6 +283,25 @@ def extrair_dados_html_nfce(html_content):
                 'valor_unitario': valor_unit,
                 'valor_total': valor_item
             })
+        
+        # Padrão 2: formato alternativo com linha de itens
+        if not itens:
+            pattern2 = r'<strong>(\d+)</strong>\s*-\s*([^<]+).*?Qtde\.?:\s*(\d+(?:,\d+)?).*?Vl\.\s*Unit\.?:\s*([\d,]+).*?Vl\.\s*Total:\s*([\d,]+)'
+            matches = re.finditer(pattern2, html_content, re.DOTALL)
+            
+            for match in matches:
+                nome_prod = match.group(2).strip()
+                nome_prod = re.sub(r'<[^>]+>', '', nome_prod)
+                qtd = float(match.group(3).replace(',', '.'))
+                valor_unit = float(match.group(4).replace(',', '.'))
+                valor_item = float(match.group(5).replace(',', '.'))
+                
+                itens.append({
+                    'produto': nome_prod,
+                    'quantidade': qtd,
+                    'valor_unitario': valor_unit,
+                    'valor_total': valor_item
+                })
         
         # Criar descrição
         descricao = f"Compra {nome_fornecedor}"
@@ -834,9 +857,10 @@ def main():
                         st.info(f"📝 Descrição: {dados['descricao']}")
                         
                         # Mostrar itens da nota fiscal
-                        if dados['itens']:
-                            st.markdown("---")
-                            st.markdown("### 🛒 Itens da Nota Fiscal")
+                        st.markdown("---")
+                        st.markdown("### 🛒 Itens da Nota Fiscal")
+                        
+                        if dados.get('itens') and len(dados['itens']) > 0:
                             st.markdown(f"**Total de itens:** {len(dados['itens'])}")
                             
                             # Criar DataFrame com os itens
@@ -850,6 +874,9 @@ def main():
                             
                             # Mostrar tabela
                             st.dataframe(df_itens, use_container_width=True, hide_index=True)
+                        else:
+                            st.warning("⚠️ Não foi possível extrair os itens do arquivo. Verifique se o formato está correto.")
+                            st.info("💡 **Dica:** Alguns cupons fiscais em HTML podem não conter os detalhes dos produtos. Tente fazer o download do XML puro através do QR Code.")
                         
                         st.markdown("---")
                         
