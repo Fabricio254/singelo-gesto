@@ -609,6 +609,47 @@ def excluir_entrega(supabase: Client, entrega_id: int):
     result = supabase.table("singelo_entregas").delete().eq("id", entrega_id).execute()
     return result
 
+def atualizar_compra(supabase: Client, compra_id: int, valor_total: float, descricao: str = ""):
+    """Atualiza uma compra existente"""
+    data = {
+        "valor_total": valor_total,
+        "descricao": descricao
+    }
+    result = supabase.table("singelo_compras").update(data).eq("id", compra_id).execute()
+    return result
+
+def atualizar_venda(supabase: Client, venda_id: int, produto: str, quantidade: int, valor_total: float, 
+                    taxa_entrega: float = 0, tamanho: str = "", data_entrega=None, cep: str = "", 
+                    logradouro: str = "", numero: str = "", complemento: str = "", bairro: str = "", 
+                    cidade: str = "", uf: str = ""):
+    """Atualiza uma venda existente"""
+    data = {
+        "produto": produto,
+        "quantidade": quantidade,
+        "valor_total": valor_total,
+        "taxa_entrega": taxa_entrega,
+        "tamanho": tamanho,
+        "data_entrega": data_entrega.isoformat() if data_entrega else None,
+        "cep": cep,
+        "logradouro": logradouro,
+        "numero": numero,
+        "complemento": complemento,
+        "bairro": bairro,
+        "cidade": cidade,
+        "uf": uf
+    }
+    result = supabase.table("singelo_vendas").update(data).eq("id", venda_id).execute()
+    return result
+
+def atualizar_entrega(supabase: Client, entrega_id: int, custo_entregador: float, descricao: str = ""):
+    """Atualiza um custo de entrega existente"""
+    data = {
+        "custo_entregador": custo_entregador,
+        "descricao": descricao
+    }
+    result = supabase.table("singelo_entregas").update(data).eq("id", entrega_id).execute()
+    return result
+
 def buscar_compras(supabase: Client, limite: int = 50):
     """Busca as últimas compras"""
     result = supabase.table("singelo_compras").select("*").order("data", desc=True).limit(limite).execute()
@@ -1580,9 +1621,9 @@ def main():
                 st.markdown(f"**Total de Compras:** R$ {total:,.2f}")
                 st.markdown("---")
                 
-                # Mostrar cada compra com botão de excluir
+                # Mostrar cada compra com botão de editar e excluir
                 for compra in compras:
-                    col1, col2, col3, col4 = st.columns([2, 2, 3, 1])
+                    col1, col2, col3, col4, col5 = st.columns([2, 2, 3, 1, 1])
                     
                     data_formatada = datetime.fromisoformat(compra['data'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
                     descricao = compra.get('descricao', '-')
@@ -1602,6 +1643,9 @@ def main():
                         else:
                             st.write(f"📝 {descricao_curta}")
                     with col4:
+                        if st.button("✏️", key=f"edit_compra_{compra['id']}", help="Editar", use_container_width=True):
+                            st.session_state.editando_compra = compra
+                    with col5:
                         if st.button("🗑️", key=f"del_compra_{compra['id']}", help="Excluir", use_container_width=True):
                             try:
                                 excluir_compra(supabase, compra['id'])
@@ -1611,6 +1655,42 @@ def main():
                                 st.error(f"❌ Erro: {str(e)}")
                     
                     st.markdown("---")
+                
+                # Modal de edição de compra
+                if 'editando_compra' in st.session_state and st.session_state.editando_compra:
+                    compra = st.session_state.editando_compra
+                    
+                    with st.form(f"form_edit_compra_{compra['id']}"):
+                        st.markdown(f"### ✏️ Editar Compra - {data_formatada}")
+                        
+                        novo_valor = st.number_input(
+                            "💵 Valor Total (R$)",
+                            min_value=0.01,
+                            value=float(compra['valor_total']),
+                            step=0.01,
+                            format="%.2f"
+                        )
+                        
+                        nova_descricao = st.text_area(
+                            "📝 Descrição",
+                            value=compra.get('descricao', ''),
+                            height=100
+                        )
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Salvar", use_container_width=True, type="primary"):
+                                try:
+                                    atualizar_compra(supabase, compra['id'], novo_valor, nova_descricao)
+                                    st.success("✅ Compra atualizada!")
+                                    del st.session_state.editando_compra
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro: {str(e)}")
+                        with col2:
+                            if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                                del st.session_state.editando_compra
+                                st.rerun()
             else:
                 st.info("📭 Nenhuma compra registrada ainda")
         
@@ -1631,9 +1711,9 @@ def main():
                 
                 st.markdown("---")
                 
-                # Mostrar cada venda com botão de excluir
+                # Mostrar cada venda com botão de editar e excluir
                 for venda in vendas:
-                    col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1.5, 1, 1.5, 1])
+                    col1, col2, col3, col4, col5, col6, col7 = st.columns([2, 2, 1.5, 1, 1.5, 0.7, 0.7])
                     
                     data_formatada = datetime.fromisoformat(venda['data'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
                     
@@ -1648,6 +1728,9 @@ def main():
                     with col5:
                         st.write(f"💵 R$ {float(venda['valor_total']):,.2f}")
                     with col6:
+                        if st.button("✏️", key=f"edit_venda_{venda['id']}", help="Editar", use_container_width=True):
+                            st.session_state.editando_venda = venda
+                    with col7:
                         if st.button("🗑️", key=f"del_venda_{venda['id']}", help="Excluir", use_container_width=True):
                             try:
                                 excluir_venda(supabase, venda['id'])
@@ -1657,6 +1740,47 @@ def main():
                                 st.error(f"❌ Erro: {str(e)}")
                     
                     st.markdown("---")
+                
+                # Modal de edição de venda
+                if 'editando_venda' in st.session_state and st.session_state.editando_venda:
+                    venda = st.session_state.editando_venda
+                    
+                    with st.form(f"form_edit_venda_{venda['id']}"):
+                        st.markdown(f"### ✏️ Editar Venda")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            novo_produto = st.selectbox("🎁 Box", options=BOXES, index=BOXES.index(venda['produto']) if venda['produto'] in BOXES else 0)
+                        with col2:
+                            novo_tamanho = st.selectbox("📏 Tamanho", options=list(TAMANHOS.keys()), 
+                                                       index=list(TAMANHOS.keys()).index(venda.get('tamanho', 'Box mini')) if venda.get('tamanho') in TAMANHOS.keys() else 0)
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            nova_quantidade = st.number_input("📦 Quantidade", min_value=1, value=venda['quantidade'], step=1)
+                        with col2:
+                            novo_valor = st.number_input("💵 Valor (R$)", min_value=0.01, value=float(venda['valor_total']), step=0.01, format="%.2f")
+                        with col3:
+                            nova_taxa = st.number_input("🚚 Taxa Entrega (R$)", min_value=0.00, value=float(venda.get('taxa_entrega', 0)), step=0.01, format="%.2f")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Salvar", use_container_width=True, type="primary"):
+                                try:
+                                    atualizar_venda(supabase, venda['id'], novo_produto, nova_quantidade, novo_valor, nova_taxa, novo_tamanho,
+                                                   data_entrega=venda.get('data_entrega'), cep=venda.get('cep', ''), 
+                                                   logradouro=venda.get('logradouro', ''), numero=venda.get('numero', ''),
+                                                   complemento=venda.get('complemento', ''), bairro=venda.get('bairro', ''),
+                                                   cidade=venda.get('cidade', ''), uf=venda.get('uf', ''))
+                                    st.success("✅ Venda atualizada!")
+                                    del st.session_state.editando_venda
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro: {str(e)}")
+                        with col2:
+                            if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                                del st.session_state.editando_venda
+                                st.rerun()
                 
                 # Resumo por produto
                 st.markdown("#### 📊 Vendas por Produto")
@@ -1683,9 +1807,9 @@ def main():
                 st.markdown(f"**Total Pago aos Entregadores:** R$ {total:,.2f}")
                 st.markdown("---")
                 
-                # Mostrar cada entrega com botão de excluir
+                # Mostrar cada entrega com botão de editar e excluir
                 for entrega in entregas:
-                    col1, col2, col3, col4 = st.columns([2, 2, 3, 1])
+                    col1, col2, col3, col4, col5 = st.columns([2, 2, 3, 1, 1])
                     
                     data_formatada = datetime.fromisoformat(entrega['data'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
                     
@@ -1696,6 +1820,9 @@ def main():
                     with col3:
                         st.write(f"📝 {entrega.get('descricao', '-')}")
                     with col4:
+                        if st.button("✏️", key=f"edit_entrega_{entrega['id']}", help="Editar", use_container_width=True):
+                            st.session_state.editando_entrega = entrega
+                    with col5:
                         if st.button("🗑️", key=f"del_entrega_{entrega['id']}", help="Excluir", use_container_width=True):
                             try:
                                 excluir_entrega(supabase, entrega['id'])
@@ -1703,6 +1830,44 @@ def main():
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Erro: {str(e)}")
+                    
+                    st.markdown("---")
+                
+                # Modal de edição de entrega
+                if 'editando_entrega' in st.session_state and st.session_state.editando_entrega:
+                    entrega = st.session_state.editando_entrega
+                    
+                    with st.form(f"form_edit_entrega_{entrega['id']}"):
+                        st.markdown(f"### ✏️ Editar Custo de Entrega")
+                        
+                        novo_custo = st.number_input(
+                            "💵 Custo (R$)",
+                            min_value=0.01,
+                            value=float(entrega['custo_entregador']),
+                            step=0.01,
+                            format="%.2f"
+                        )
+                        
+                        nova_descricao = st.text_area(
+                            "📝 Descrição",
+                            value=entrega.get('descricao', ''),
+                            height=100
+                        )
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Salvar", use_container_width=True, type="primary"):
+                                try:
+                                    atualizar_entrega(supabase, entrega['id'], novo_custo, nova_descricao)
+                                    st.success("✅ Custo atualizado!")
+                                    del st.session_state.editando_entrega
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro: {str(e)}")
+                        with col2:
+                            if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                                del st.session_state.editando_entrega
+                                st.rerun()
                     
                     st.markdown("---")
             else:
