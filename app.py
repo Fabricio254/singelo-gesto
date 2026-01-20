@@ -285,6 +285,12 @@ def extrair_dados_html_nfce(html_content):
         if numero_nf:
             descricao += f" - NF {numero_nf}"
         
+        # Adicionar lista de itens na descrição
+        if itens:
+            descricao += "\n\nItens comprados:"
+            for i, item in enumerate(itens, 1):
+                descricao += f"\n{i}. {item['produto']} - {item['quantidade']:.0f} un - R$ {item['valor_total']:.2f}"
+        
         return {
             "valor_total": valor_total,
             "data": data_emissao,
@@ -387,6 +393,12 @@ def extrair_dados_xml_nfe(xml_content):
         descricao = f"Compra {nome_fornecedor}"
         if numero_nf:
             descricao += f" - NF {numero_nf}"
+        
+        # Adicionar lista de itens na descrição
+        if itens:
+            descricao += "\n\nItens comprados:"
+            for i, item in enumerate(itens, 1):
+                descricao += f"\n{i}. {item['produto']} - {item['quantidade']:.0f} un - R$ {item['valor_total']:.2f}"
         
         return {
             "valor_total": valor_total,
