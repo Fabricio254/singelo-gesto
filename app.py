@@ -262,17 +262,15 @@ def extrair_dados_html_nfce(html_content):
         
         numero_nf = match_numero.group(1) if match_numero else ""
         
-        # Extrair itens - tentar múltiplos padrões
+        # Extrair itens - formato específico SEFAZ-ES
         itens = []
         
-        # Padrão 1: formato padrão com txtTit
-        pattern1 = r'<span class="txtTit">(.*?)</span>.*?<strong>Qtde\.?:\s*(\d+(?:,\d+)?)</strong>.*?<strong>Vl\.\s*Unit\.?:</strong>\s*([\d,]+)</span>.*?<span class="valor">([\d,]+)</span>'
-        matches = re.finditer(pattern1, html_content, re.DOTALL)
+        # Padrão para o formato usado pela SEFAZ-ES com spans Rqtd e RvlUnit
+        pattern = r'<span class="txtTit">([^<]+)</span>.*?<span class="Rqtd">\s*<strong>Qtde\.?:\s*</strong>\s*(\d+(?:,\d+)?)\s*</span>.*?<span class="RvlUnit">\s*<strong>Vl\.\s*Unit\.?:\s*</strong>\s*([\d,]+)\s*</span>.*?Vl\.\s*Total.*?<span class="valor">([\d,]+)</span>'
+        matches = re.finditer(pattern, html_content, re.DOTALL | re.IGNORECASE)
         
         for match in matches:
             nome_prod = match.group(1).strip()
-            # Limpar tags HTML do nome do produto
-            nome_prod = re.sub(r'<[^>]+>', '', nome_prod)
             qtd = float(match.group(2).replace(',', '.'))
             valor_unit = float(match.group(3).replace(',', '.'))
             valor_item = float(match.group(4).replace(',', '.'))
@@ -283,25 +281,6 @@ def extrair_dados_html_nfce(html_content):
                 'valor_unitario': valor_unit,
                 'valor_total': valor_item
             })
-        
-        # Padrão 2: formato alternativo com linha de itens
-        if not itens:
-            pattern2 = r'<strong>(\d+)</strong>\s*-\s*([^<]+).*?Qtde\.?:\s*(\d+(?:,\d+)?).*?Vl\.\s*Unit\.?:\s*([\d,]+).*?Vl\.\s*Total:\s*([\d,]+)'
-            matches = re.finditer(pattern2, html_content, re.DOTALL)
-            
-            for match in matches:
-                nome_prod = match.group(2).strip()
-                nome_prod = re.sub(r'<[^>]+>', '', nome_prod)
-                qtd = float(match.group(3).replace(',', '.'))
-                valor_unit = float(match.group(4).replace(',', '.'))
-                valor_item = float(match.group(5).replace(',', '.'))
-                
-                itens.append({
-                    'produto': nome_prod,
-                    'quantidade': qtd,
-                    'valor_unitario': valor_unit,
-                    'valor_total': valor_item
-                })
         
         # Criar descrição
         descricao = f"Compra {nome_fornecedor}"
