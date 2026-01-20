@@ -1106,13 +1106,22 @@ def main():
                     col1, col2, col3, col4 = st.columns([2, 2, 3, 1])
                     
                     data_formatada = datetime.fromisoformat(compra['data'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
+                    descricao = compra.get('descricao', '-')
+                    
+                    # Se a descrição tiver múltiplas linhas (itens), mostrar só a primeira linha
+                    descricao_curta = descricao.split('\n')[0] if descricao else '-'
                     
                     with col1:
                         st.write(f"📅 {data_formatada}")
                     with col2:
                         st.write(f"💵 R$ {float(compra['valor_total']):,.2f}")
                     with col3:
-                        st.write(f"📝 {compra.get('descricao', '-')}")
+                        # Usar expander para descrições longas
+                        if '\n' in descricao:
+                            with st.expander(f"📝 {descricao_curta}"):
+                                st.text(descricao)
+                        else:
+                            st.write(f"📝 {descricao_curta}")
                     with col4:
                         if st.button("🗑️", key=f"del_compra_{compra['id']}", help="Excluir", use_container_width=True):
                             try:
