@@ -231,6 +231,37 @@ def buscar_xml_por_chave(chave_acesso):
 def extrair_dados_xml_nfe(xml_content):
     """Extrai dados relevantes do XML da NF-e"""
     try:
+        # Se for bytes, decodificar
+        if isinstance(xml_content, bytes):
+            try:
+                xml_content = xml_content.decode('utf-8')
+            except:
+                xml_content = xml_content.decode('latin-1')
+        
+        # Limpar o XML de possíveis problemas
+        # Remover BOM (Byte Order Mark)
+        xml_content = xml_content.replace('\ufeff', '')
+        
+        # Remover possíveis tags HTML
+        xml_content = xml_content.replace('&nbsp;', ' ')
+        xml_content = xml_content.replace('&amp;', '&')
+        xml_content = xml_content.replace('&lt;', '<')
+        xml_content = xml_content.replace('&gt;', '>')
+        
+        # Tentar encontrar o início do XML se houver HTML antes
+        if '<?xml' in xml_content:
+            xml_content = xml_content[xml_content.index('<?xml'):]
+        elif '<nfeProc' in xml_content:
+            xml_content = '<?xml version="1.0" encoding="UTF-8"?>' + xml_content[xml_content.index('<nfeProc'):]
+        elif '<NFe' in xml_content:
+            xml_content = '<?xml version="1.0" encoding="UTF-8"?>' + xml_content[xml_content.index('<NFe'):]
+        
+        # Remover qualquer coisa depois da tag de fechamento
+        if '</nfeProc>' in xml_content:
+            xml_content = xml_content[:xml_content.index('</nfeProc>') + len('</nfeProc>')]
+        elif '</NFe>' in xml_content:
+            xml_content = xml_content[:xml_content.index('</NFe>') + len('</NFe>')]
+        
         # Parse do XML
         root = ET.fromstring(xml_content)
         
@@ -289,6 +320,15 @@ def extrair_dados_xml_nfe(xml_content):
             "itens": itens,
             "sucesso": True,
             "mensagem": "XML lido com sucesso!"
+        }
+    except ET.ParseError as e:
+        return {
+            "valor_total": 0.0,
+            "data": datetime.now(),
+            "descricao": "",
+            "itens": [],
+            "sucesso": False,
+            "mensagem": f"Erro ao processar XML: Formato inválido. Tente salvar o XML novamente usando 'Exibir código-fonte' na página da SEFAZ."
         }
     except Exception as e:
         return {
