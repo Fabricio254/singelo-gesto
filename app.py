@@ -750,12 +750,12 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             query_entregas = query_entregas.gte("data", data_inicio.isoformat())
         
         if data_fim:
-            # Adicionar 1 dia para incluir o dia final completo
+            # Incluir o dia final completo (até 23:59:59)
             from datetime import timedelta
-            data_fim_ajustada = data_fim + timedelta(days=1)
-            query_parcelas = query_parcelas.lt("data_vencimento", data_fim_ajustada.isoformat())
-            query_vendas = query_vendas.lt("data", data_fim_ajustada.isoformat())
-            query_entregas = query_entregas.lt("data", data_fim_ajustada.isoformat())
+            data_fim_final = datetime.combine(data_fim, datetime.max.time())
+            query_parcelas = query_parcelas.lte("data_vencimento", data_fim_final.isoformat())
+            query_vendas = query_vendas.lte("data", data_fim_final.isoformat())
+            query_entregas = query_entregas.lte("data", data_fim_final.isoformat())
         
         parcelas = query_parcelas.execute()
         vendas = query_vendas.execute()
