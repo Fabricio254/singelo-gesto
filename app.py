@@ -5,6 +5,7 @@ import pandas as pd
 from PIL import Image
 import xml.etree.ElementTree as ET
 import requests
+import re
 
 # ==================== CONFIGURAÇÕES ====================
 # Configurações do Supabase
@@ -226,6 +227,80 @@ def buscar_xml_por_chave(chave_acesso):
         return {
             "sucesso": False,
             "mensagem": f"Erro ao processar chave: {str(e)}"
+        }
+
+def extrair_dados_html_nfce(html_content):
+    """Extrai dados do HTML do DANFE quando o XML não está disponível"""
+    try:
+        if isinstance(html_content, bytes):
+            try:
+                html_content = html_content.decode('utf-8')
+            except:
+                html_content = html_content.decode('latin-1')
+        
+        # Extrair valor a pagar
+        match_valor = re.search(r'Valor a pagar R\$.*?<span class="totalNumb txtMax">(\d+,\d+)</span>', html_content, re.DOTALL)
+        valor_total = 0.0
+        if match_valor:
+            valor_str = match_valor.group(1).replace(',', '.')
+            valor_total = float(valor_str)
+        
+        # Extrair nome do fornecedor
+        match_fornecedor = re.search(r'<div id="u20" class="txtTopo">(.*?)</div>', html_content)
+        nome_fornecedor = match_fornecedor.group(1).strip() if match_fornecedor else "Fornecedor"
+        
+        # Extrair data e número da nota
+        match_data = re.search(r'<strong>Emissão: </strong>(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2})', html_content)
+        match_numero = re.search(r'<strong>Número: </strong>(\d+)', html_content)
+        
+        data_emissao = datetime.now()
+        if match_data:
+            try:
+                data_emissao = datetime.strptime(match_data.group(1), '%d/%m/%Y %H:%M:%S')
+            except:
+                pass
+        
+        numero_nf = match_numero.group(1) if match_numero else ""
+        
+        # Extrair itens
+        itens = []
+        pattern_itens = r'<span class="txtTit">(.*?)</span>.*?<strong>Qtde\.:(\d+)</strong>.*?<strong>Vl\. Unit\.:</strong> ([\d,]+)</span>.*?<span class="valor">([\d,]+)</span>'
+        matches = re.finditer(pattern_itens, html_content, re.DOTALL)
+        
+        for match in matches:
+            nome_prod = match.group(1).strip()
+            qtd = float(match.group(2))
+            valor_unit = float(match.group(3).replace(',', '.'))
+            valor_item = float(match.group(4).replace(',', '.'))
+            
+            itens.append({
+                'produto': nome_prod,
+                'quantidade': qtd,
+                'valor_unitario': valor_unit,
+                'valor_total': valor_item
+            })
+        
+        # Criar descrição
+        descricao = f"Compra {nome_fornecedor}"
+        if numero_nf:
+            descricao += f" - NF {numero_nf}"
+        
+        return {
+            "valor_total": valor_total,
+            "data": data_emissao,
+            "descricao": descricao,
+            "itens": itens,
+            "sucesso": True,
+            "mensagem": "Dados extraídos do HTML do cupom com sucesso!"
+        }
+    except Exception as e:
+        return {
+            "valor_total": 0.0,
+            "data": datetime.now(),
+            "descricao": "",
+            "itens": [],
+            "sucesso": False,
+            "mensagem": f"Erro ao extrair dados do HTML: {str(e)}"
         }
 
 def extrair_dados_xml_nfe(xml_content):
@@ -720,8 +795,15 @@ def main():
                     # Ler conteúdo do arquivo
                     xml_content = uploaded_file.read()
                     
-                    # Extrair dados do XML
-                    dados = extrair_dados_xml_nfe(xml_content)
+                    # Verificar se é HTML (DANFE) ou XML
+                    content_str = xml_content.decode('utf-8', errors='ignore') if isinstance(xml_content, bytes) else xml_content
+                    
+                    if '<!DOCTYPE html>' in content_str or '<html' in content_str:
+                        # É um HTML do DANFE, extrair dados do HTML
+                        dados = extrair_dados_html_nfce(xml_content)
+                    else:
+                        # É XML, processar normalmente
+                        dados = extrair_dados_xml_nfe(xml_content)
                     
                     if dados['sucesso']:
                         st.success(dados['mensagem'])
