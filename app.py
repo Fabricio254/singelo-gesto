@@ -1181,6 +1181,18 @@ def main():
         st.markdown("---")
         st.markdown("### 📍 Endereço de Entrega")
         
+        # Inicializar session_state para endereço se não existir
+        if 'endereco_logradouro' not in st.session_state:
+            st.session_state.endereco_logradouro = ''
+        if 'endereco_bairro' not in st.session_state:
+            st.session_state.endereco_bairro = ''
+        if 'endereco_cidade' not in st.session_state:
+            st.session_state.endereco_cidade = ''
+        if 'endereco_uf' not in st.session_state:
+            st.session_state.endereco_uf = ''
+        if 'ultimo_cep' not in st.session_state:
+            st.session_state.ultimo_cep = ''
+        
         # Campo de data de entrega
         col1, col2 = st.columns(2)
         with col1:
@@ -1188,6 +1200,7 @@ def main():
                 "📅 Data de Entrega",
                 value=datetime.now().date(),
                 help="Data prevista para entrega",
+                format="DD/MM/YYYY",
                 key="data_entrega"
             )
         
@@ -1196,27 +1209,34 @@ def main():
                 "📮 CEP",
                 max_chars=9,
                 placeholder="00000-000",
-                help="Digite o CEP e pressione Enter para buscar o endereço",
+                help="Digite o CEP (8 dígitos) para buscar automaticamente",
                 key="cep_input"
             )
         
         # Buscar CEP automaticamente quando digitado
-        endereco_encontrado = {}
-        if cep_input and len(''.join(filter(str.isdigit, cep_input))) == 8:
+        cep_limpo = ''.join(filter(str.isdigit, cep_input))
+        if cep_limpo and len(cep_limpo) == 8 and cep_limpo != st.session_state.ultimo_cep:
             with st.spinner("🔍 Buscando endereço..."):
                 endereco_encontrado = buscar_cep(cep_input)
                 if endereco_encontrado['sucesso']:
+                    # Atualizar session_state com os dados encontrados
+                    st.session_state.endereco_logradouro = endereco_encontrado.get('logradouro', '')
+                    st.session_state.endereco_bairro = endereco_encontrado.get('bairro', '')
+                    st.session_state.endereco_cidade = endereco_encontrado.get('cidade', '')
+                    st.session_state.endereco_uf = endereco_encontrado.get('uf', '')
+                    st.session_state.ultimo_cep = cep_limpo
                     st.success(f"✅ Endereço encontrado: {endereco_encontrado['logradouro']}, {endereco_encontrado['bairro']} - {endereco_encontrado['cidade']}/{endereco_encontrado['uf']}")
+                    st.rerun()
                 else:
                     st.warning(f"⚠️ {endereco_encontrado['mensagem']}")
         
-        # Campos de endereço
+        # Campos de endereço (editáveis, preenchidos automaticamente)
         col1, col2 = st.columns([3, 1])
         
         with col1:
             logradouro = st.text_input(
                 "🏠 Rua/Avenida",
-                value=endereco_encontrado.get('logradouro', '') if endereco_encontrado.get('sucesso') else '',
+                value=st.session_state.endereco_logradouro,
                 placeholder="Ex: Rua das Flores",
                 key="logradouro"
             )
@@ -1233,7 +1253,7 @@ def main():
         with col1:
             bairro = st.text_input(
                 "🏘️ Bairro",
-                value=endereco_encontrado.get('bairro', '') if endereco_encontrado.get('sucesso') else '',
+                value=st.session_state.endereco_bairro,
                 placeholder="Ex: Centro",
                 key="bairro"
             )
@@ -1250,7 +1270,7 @@ def main():
         with col1:
             cidade = st.text_input(
                 "🌆 Cidade",
-                value=endereco_encontrado.get('cidade', '') if endereco_encontrado.get('sucesso') else '',
+                value=st.session_state.endereco_cidade,
                 placeholder="Ex: São Paulo",
                 key="cidade"
             )
@@ -1258,7 +1278,7 @@ def main():
         with col2:
             uf = st.text_input(
                 "🗺️ Estado (UF)",
-                value=endereco_encontrado.get('uf', '') if endereco_encontrado.get('sucesso') else '',
+                value=st.session_state.endereco_uf,
                 max_chars=2,
                 placeholder="SP",
                 key="uf"
@@ -1304,6 +1324,14 @@ def main():
                             💰 Custo registrado: R$ {custo_total:,.2f}
                         </div>
                     """, unsafe_allow_html=True)
+                    
+                    # Limpar session_state do endereço para nova venda
+                    st.session_state.endereco_logradouro = ''
+                    st.session_state.endereco_bairro = ''
+                    st.session_state.endereco_cidade = ''
+                    st.session_state.endereco_uf = ''
+                    st.session_state.ultimo_cep = ''
+                    
                     st.balloons()
                 except Exception as e:
                     st.error(f"❌ Erro ao registrar venda: {str(e)}")
