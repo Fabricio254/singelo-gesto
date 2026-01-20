@@ -511,7 +511,54 @@ def marcar_parcela_pendente(supabase: Client, parcela_id: int):
     result = supabase.table("singelo_parcelas_compras").update(data).eq("id", parcela_id).execute()
     return result
 
-def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: float, taxa_entrega: float = 0, tamanho: str = ""):
+def buscar_cep(cep: str):
+    """Busca informações de endereço pelo CEP usando ViaCEP"""
+    try:
+        # Remover formatação do CEP
+        cep_limpo = ''.join(filter(str.isdigit, cep))
+        
+        if len(cep_limpo) != 8:
+            return {
+                "sucesso": False,
+                "mensagem": "CEP deve ter 8 dígitos"
+            }
+        
+        # Buscar na API ViaCEP
+        url = f"https://viacep.com.br/ws/{cep_limpo}/json/"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            dados = response.json()
+            
+            if 'erro' in dados:
+                return {
+                    "sucesso": False,
+                    "mensagem": "CEP não encontrado"
+                }
+            
+            return {
+                "sucesso": True,
+                "cep": cep_limpo,
+                "logradouro": dados.get('logradouro', ''),
+                "bairro": dados.get('bairro', ''),
+                "cidade": dados.get('localidade', ''),
+                "uf": dados.get('uf', ''),
+                "complemento": dados.get('complemento', '')
+            }
+        else:
+            return {
+                "sucesso": False,
+                "mensagem": "Erro ao consultar CEP"
+            }
+    except Exception as e:
+        return {
+            "sucesso": False,
+            "mensagem": f"Erro: {str(e)}"
+        }
+
+def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: float, taxa_entrega: float = 0, 
+                  tamanho: str = "", data_entrega=None, cep: str = "", logradouro: str = "", numero: str = "", 
+                  complemento: str = "", bairro: str = "", cidade: str = "", uf: str = ""):
     """Insere uma nova venda no banco"""
     data = {
         "data": datetime.now().isoformat(),
@@ -519,7 +566,15 @@ def inserir_venda(supabase: Client, produto: str, quantidade: int, valor_total: 
         "quantidade": quantidade,
         "valor_total": valor_total,
         "taxa_entrega": taxa_entrega,
-        "tamanho": tamanho
+        "tamanho": tamanho,
+        "data_entrega": data_entrega.isoformat() if data_entrega else None,
+        "cep": cep,
+        "logradouro": logradouro,
+        "numero": numero,
+        "complemento": complemento,
+        "bairro": bairro,
+        "cidade": cidade,
+        "uf": uf
     }
     result = supabase.table("singelo_vendas").insert(data).execute()
     return result
@@ -1124,6 +1179,92 @@ def main():
             )
         
         st.markdown("---")
+        st.markdown("### 📍 Endereço de Entrega")
+        
+        # Campo de data de entrega
+        col1, col2 = st.columns(2)
+        with col1:
+            data_entrega = st.date_input(
+                "📅 Data de Entrega",
+                value=datetime.now().date(),
+                help="Data prevista para entrega",
+                key="data_entrega"
+            )
+        
+        with col2:
+            cep_input = st.text_input(
+                "📮 CEP",
+                max_chars=9,
+                placeholder="00000-000",
+                help="Digite o CEP e pressione Enter para buscar o endereço",
+                key="cep_input"
+            )
+        
+        # Buscar CEP automaticamente quando digitado
+        endereco_encontrado = {}
+        if cep_input and len(''.join(filter(str.isdigit, cep_input))) == 8:
+            with st.spinner("🔍 Buscando endereço..."):
+                endereco_encontrado = buscar_cep(cep_input)
+                if endereco_encontrado['sucesso']:
+                    st.success(f"✅ Endereço encontrado: {endereco_encontrado['logradouro']}, {endereco_encontrado['bairro']} - {endereco_encontrado['cidade']}/{endereco_encontrado['uf']}")
+                else:
+                    st.warning(f"⚠️ {endereco_encontrado['mensagem']}")
+        
+        # Campos de endereço
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            logradouro = st.text_input(
+                "🏠 Rua/Avenida",
+                value=endereco_encontrado.get('logradouro', '') if endereco_encontrado.get('sucesso') else '',
+                placeholder="Ex: Rua das Flores",
+                key="logradouro"
+            )
+        
+        with col2:
+            numero = st.text_input(
+                "🔢 Número",
+                placeholder="123",
+                key="numero"
+            )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            bairro = st.text_input(
+                "🏘️ Bairro",
+                value=endereco_encontrado.get('bairro', '') if endereco_encontrado.get('sucesso') else '',
+                placeholder="Ex: Centro",
+                key="bairro"
+            )
+        
+        with col2:
+            complemento = st.text_input(
+                "🏢 Complemento (opcional)",
+                placeholder="Ex: Apto 101, Bloco B",
+                key="complemento"
+            )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            cidade = st.text_input(
+                "🌆 Cidade",
+                value=endereco_encontrado.get('cidade', '') if endereco_encontrado.get('sucesso') else '',
+                placeholder="Ex: São Paulo",
+                key="cidade"
+            )
+        
+        with col2:
+            uf = st.text_input(
+                "🗺️ Estado (UF)",
+                value=endereco_encontrado.get('uf', '') if endereco_encontrado.get('sucesso') else '',
+                max_chars=2,
+                placeholder="SP",
+                key="uf"
+            )
+        
+        st.markdown("---")
         
         # Botão de submit fora do form
         if st.button("✅ Registrar Venda", use_container_width=True, type="primary", key="btn_submit_venda"):
@@ -1138,13 +1279,19 @@ def main():
                 st.error("❌ A quantidade deve ser maior que zero!")
             else:
                 try:
-                    # Registrar a venda
-                    inserir_venda(supabase, produto, quantidade, valor, taxa_entrega, tamanho)
+                    # Registrar a venda com endereço
+                    inserir_venda(supabase, produto, quantidade, valor, taxa_entrega, tamanho, 
+                                data_entrega, cep_input, logradouro, numero, complemento, bairro, cidade, uf)
                     
                     # Registrar o custo da box automaticamente nas compras
                     custo_total = custo_box * quantidade
                     descricao_compra = f"Custo automático: {quantidade}x {tamanho} - {produto}"
                     inserir_compra(supabase, custo_total, descricao_compra)
+                    
+                    endereco_completo = f"{logradouro}, {numero}" if numero else logradouro
+                    if complemento:
+                        endereco_completo += f" - {complemento}"
+                    endereco_completo += f" - {bairro}, {cidade}/{uf}" if cidade else ""
                     
                     st.markdown(f"""
                         <div class='success-message'>
@@ -1152,6 +1299,8 @@ def main():
                             {produto} ({tamanho}) - {quantidade} unidade(s)<br>
                             Valor Venda: R$ {valor:,.2f}<br>
                             Taxa Entrega: R$ {taxa_entrega:,.2f}<br>
+                            📅 Entrega: {data_entrega.strftime('%d/%m/%Y')}<br>
+                            📍 Endereço: {endereco_completo}<br>
                             💰 Custo registrado: R$ {custo_total:,.2f}
                         </div>
                     """, unsafe_allow_html=True)
