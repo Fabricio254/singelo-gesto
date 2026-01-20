@@ -441,7 +441,7 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
     result = supabase.table("singelo_compras").insert(data).execute()
     compra_id = result.data[0]['id']
     
-    # Criar parcelas
+    # Criar parcelas com vencimento sempre no dia 12
     if num_parcelas > 1:
         valor_parcela = valor_total / num_parcelas
         for i in range(num_parcelas):
@@ -454,7 +454,14 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
                 mes_vencimento -= 12
                 ano_vencimento += 1
             
-            data_vencimento = data_base.replace(year=ano_vencimento, month=mes_vencimento)
+            # Sempre usar dia 12 como vencimento (dia do fechamento do cartão)
+            try:
+                data_vencimento = datetime(ano_vencimento, mes_vencimento, 12)
+            except ValueError:
+                # Se o mês não tem dia 12 (não deve acontecer), usar último dia do mês
+                from calendar import monthrange
+                ultimo_dia = monthrange(ano_vencimento, mes_vencimento)[1]
+                data_vencimento = datetime(ano_vencimento, mes_vencimento, min(12, ultimo_dia))
             
             parcela_data = {
                 "compra_id": compra_id,
@@ -467,13 +474,20 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
             }
             supabase.table("singelo_parcelas_compras").insert(parcela_data).execute()
     else:
-        # Compra à vista - criar uma única parcela
+        # Compra à vista - criar uma única parcela com vencimento no dia 12 do mês atual
+        try:
+            data_vencimento = datetime(data_base.year, data_base.month, 12)
+        except ValueError:
+            from calendar import monthrange
+            ultimo_dia = monthrange(data_base.year, data_base.month)[1]
+            data_vencimento = datetime(data_base.year, data_base.month, min(12, ultimo_dia))
+        
         parcela_data = {
             "compra_id": compra_id,
             "numero_parcela": 1,
             "total_parcelas": 1,
             "valor_parcela": valor_total,
-            "data_vencimento": data_base.isoformat(),
+            "data_vencimento": data_vencimento.isoformat(),
             "status": "pendente",
             "descricao": descricao
         }
@@ -482,13 +496,17 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
     return result
 
 def buscar_parcelas_pendentes(supabase: Client, data_inicio=None, data_fim=None):
-    """Busca parcelas pendentes no período"""
+    """Busca parcelas com vencimento até o final do período (inclui parcelas futuras do mês)"""
     query = supabase.table("singelo_parcelas_compras").select("*")
     
     if data_inicio:
         query = query.gte("data_vencimento", data_inicio.isoformat())
     if data_fim:
-        query = query.lte("data_vencimento", data_fim.isoformat())
+        # Buscar até o final do mês da data_fim para pegar parcelas futuras do mês
+        from calendar import monthrange
+        ultimo_dia = monthrange(data_fim.year, data_fim.month)[1]
+        data_fim_mes = datetime(data_fim.year, data_fim.month, ultimo_dia, 23, 59, 59)
+        query = query.lte("data_vencimento", data_fim_mes.isoformat())
     
     result = query.order("data_vencimento", desc=False).execute()
     return result.data
@@ -655,7 +673,7 @@ def recalcular_parcelas(supabase: Client, compra_id: int, novo_valor_total: floa
     # Excluir parcelas antigas
     supabase.table("singelo_parcelas_compras").delete().eq("compra_id", compra_id).execute()
     
-    # Criar novas parcelas
+    # Criar novas parcelas com vencimento sempre no dia 12
     valor_parcela = novo_valor_total / novo_num_parcelas
     for i in range(novo_num_parcelas):
         # Adicionar i meses à data base
@@ -667,7 +685,14 @@ def recalcular_parcelas(supabase: Client, compra_id: int, novo_valor_total: floa
             mes_vencimento -= 12
             ano_vencimento += 1
         
-        data_vencimento = data_compra.replace(year=ano_vencimento, month=mes_vencimento)
+        # Sempre usar dia 12 como vencimento (dia do fechamento do cartão)
+        try:
+            data_vencimento = datetime(ano_vencimento, mes_vencimento, 12)
+        except ValueError:
+            # Se o mês não tem dia 12 (não deve acontecer), usar último dia do mês
+            from calendar import monthrange
+            ultimo_dia = monthrange(ano_vencimento, mes_vencimento)[1]
+            data_vencimento = datetime(ano_vencimento, mes_vencimento, min(12, ultimo_dia))
         
         parcela_data = {
             "compra_id": compra_id,
