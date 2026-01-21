@@ -1331,8 +1331,20 @@ def main():
                     try:
                         xml_content = uploaded_nfe.read()
                         
+                        # DEBUG: Mostrar info do arquivo
+                        st.info(f"📄 Arquivo: {uploaded_nfe.name} - Tamanho: {len(xml_content)} bytes")
+                        
                         with st.spinner("Processando NF-e..."):
                             dados = extrair_dados_xml_nfe(xml_content)
+                        
+                        # DEBUG: Mostrar resultado
+                        st.json({
+                            "sucesso": dados.get('sucesso'),
+                            "valor_total": dados.get('valor_total'),
+                            "fornecedor": dados.get('fornecedor'),
+                            "qtd_itens": len(dados.get('itens', [])),
+                            "mensagem": dados.get('mensagem')
+                        })
                         
                         if dados['sucesso']:
                             st.success(dados['mensagem'])
