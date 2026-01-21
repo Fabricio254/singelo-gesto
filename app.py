@@ -317,7 +317,7 @@ def extrair_dados_html_nfce(html_content):
         }
 
 def extrair_dados_xml_nfe(xml_content):
-    """Extrai dados relevantes do XML da NF-e"""
+    """Extrai dados relevantes do XML da NF-e - v2.0"""
     try:
         # Se for bytes, decodificar
         if isinstance(xml_content, bytes):
@@ -463,7 +463,8 @@ def extrair_dados_xml_nfe(xml_content):
             "fornecedor": nome_fornecedor,
             "itens": itens,
             "sucesso": True,
-            "mensagem": "XML lido com sucesso!"
+            "mensagem": f"XML lido com sucesso! {len(itens)} produtos encontrados.",
+            "tipo_documento": "NF-e"
         }
     except ET.ParseError as e:
         return {
