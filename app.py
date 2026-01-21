@@ -317,17 +317,14 @@ def extrair_dados_html_nfce(html_content):
         }
 
 def extrair_dados_xml_nfe_v2(xml_content):
-    """Extrai dados relevantes do XML da NF-e - VERSAO 2.1 FORCADA"""
-    debug_info = []  # Para rastrear o processo
+    """Extrai dados relevantes do XML da NF-e"""
     try:
         # Se for bytes, decodificar
         if isinstance(xml_content, bytes):
             try:
                 xml_content = xml_content.decode('utf-8')
-                debug_info.append("Decodificado UTF-8")
             except:
                 xml_content = xml_content.decode('latin-1')
-                debug_info.append("Decodificado Latin-1")
         
         # Limpar o XML de possíveis problemas
         # Remover BOM (Byte Order Mark)
@@ -355,7 +352,6 @@ def extrair_dados_xml_nfe_v2(xml_content):
         
         # Parse do XML
         root = ET.fromstring(xml_content)
-        debug_info.append(f"Root tag: {root.tag}")
         
         # Namespace da NF-e
         ns_url = 'http://www.portalfiscal.inf.br/nfe'
@@ -363,24 +359,19 @@ def extrair_dados_xml_nfe_v2(xml_content):
         # Se root é nfeProc, buscar o elemento NFe
         if 'nfeProc' in root.tag:
             nfe_element = root.find('{%s}NFe' % ns_url)
-            debug_info.append(f"Buscou NFe: {nfe_element is not None}")
             if nfe_element is not None:
                 root = nfe_element
         
         # Se root é NFe, buscar dentro de infNFe
         if 'NFe' in root.tag:
             infnfe_element = root.find('{%s}infNFe' % ns_url)
-            debug_info.append(f"Buscou infNFe: {infnfe_element is not None}")
             if infnfe_element is not None:
                 root = infnfe_element
-        
-        debug_info.append(f"Root final: {root.tag}")
         
         # Extrair valor total - buscar diretamente com namespace completo
         valor_element = root.find('.//{%s}vNF' % ns_url)
         if valor_element is None:
             valor_element = root.find('.//vNF')
-        debug_info.append(f"Valor encontrado: {valor_element is not None}")
         valor_total = float(valor_element.text) if valor_element is not None else 0.0
         
         # Extrair data de emissão
@@ -473,8 +464,7 @@ def extrair_dados_xml_nfe_v2(xml_content):
             "itens": itens,
             "sucesso": True,
             "mensagem": f"XML lido com sucesso! {len(itens)} produtos encontrados.",
-            "tipo_documento": "NF-e",
-            "debug": " | ".join(debug_info)
+            "tipo_documento": "NF-e"
         }
     except ET.ParseError as e:
         return {
@@ -483,8 +473,7 @@ def extrair_dados_xml_nfe_v2(xml_content):
             "descricao": "",
             "itens": [],
             "sucesso": False,
-            "mensagem": f"Erro ao processar XML: Formato inválido. Tente salvar o XML novamente usando 'Exibir código-fonte' na página da SEFAZ.",
-            "debug": f"ParseError: {str(e)}"
+            "mensagem": f"Erro ao processar XML: Formato inválido. {str(e)}"
         }
     except Exception as e:
         return {
@@ -493,8 +482,7 @@ def extrair_dados_xml_nfe_v2(xml_content):
             "descricao": "",
             "itens": [],
             "sucesso": False,
-            "mensagem": f"Erro ao ler XML: {str(e)}",
-            "debug": f"Exception: {type(e).__name__} - {str(e)}"
+            "mensagem": f"Erro ao ler XML: {str(e)}"
         }
 
 def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", data_compra=None, num_parcelas: int = 1):
@@ -1343,22 +1331,8 @@ def main():
                     try:
                         xml_content = uploaded_nfe.read()
                         
-                        # DEBUG: Mostrar info do arquivo
-                        st.info(f"📄 Arquivo: {uploaded_nfe.name} - Tamanho: {len(xml_content)} bytes")
-                        
                         with st.spinner("Processando NF-e..."):
-                            # FORÇAR RELOAD - usar função nova
                             dados = extrair_dados_xml_nfe_v2(xml_content)
-                        
-                        # DEBUG: Mostrar resultado
-                        st.json({
-                            "sucesso": dados.get('sucesso'),
-                            "valor_total": dados.get('valor_total'),
-                            "fornecedor": dados.get('fornecedor'),
-                            "qtd_itens": len(dados.get('itens', [])),
-                            "mensagem": dados.get('mensagem'),
-                            "debug": dados.get('debug', 'N/A')
-                        })
                         
                         if dados['sucesso']:
                             st.success(dados['mensagem'])
