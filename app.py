@@ -1585,9 +1585,6 @@ def main():
                                             st.warning("⚠️ Cole o XML completo")
                 else:
                     st.warning("⚠️ Digite a chave de 44 dígitos")
-                            st.warning("💡 Certifique-se de colar o conteúdo completo do arquivo XML")
-                    else:
-                        st.warning("⚠️ Cole o conteúdo completo do XML (deve ter pelo menos 100 caracteres)")
     
     # ==================== LANÇAR VENDA ====================
     elif opcao == "💰 Lançar Venda":
