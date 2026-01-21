@@ -859,7 +859,7 @@ def main():
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
             "Selecione uma opção:",
-            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "📋 Histórico"],
+            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "� Custos Produtos", "�📋 Histórico"],
             label_visibility="collapsed"
         )
         
@@ -1717,6 +1717,106 @@ def main():
                     st.info("Nenhuma parcela paga no período selecionado")
         else:
             st.info("Nenhuma conta a pagar encontrada no período selecionado")
+    
+    # ==================== CUSTOS PRODUTOS ====================
+    elif opcao == "📦 Custos Produtos":
+        st.markdown("## 📦 Custos dos Produtos")
+        st.info("""
+        💡 **Informação importante:**
+        
+        Para ter o controle de custos por produto, você precisa:
+        
+        1. Criar a tabela **singelo_itens_compras** no Supabase com os campos:
+           - id (int8, primary key, auto-increment)
+           - compra_id (int8, referência para singelo_compras)
+           - nome_produto (text)
+           - descricao (text)
+           - quantidade (numeric)
+           - valor_unitario (numeric)
+           - valor_total (numeric)
+           - created_at (timestamp with time zone, default now())
+        
+        2. Execute o SQL abaixo no Supabase:
+        
+        ```sql
+        CREATE TABLE singelo_itens_compras (
+            id BIGSERIAL PRIMARY KEY,
+            compra_id BIGINT REFERENCES singelo_compras(id) ON DELETE CASCADE,
+            nome_produto TEXT NOT NULL,
+            descricao TEXT,
+            quantidade NUMERIC NOT NULL,
+            valor_unitario NUMERIC NOT NULL,
+            valor_total NUMERIC NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        ```
+        
+        Após criar a tabela, volte aqui para ver os custos dos produtos!
+        """)
+        
+        # Verificar se a tabela existe tentando fazer uma query
+        try:
+            teste = supabase.table("singelo_itens_compras").select("id").limit(1).execute()
+            st.success("✅ Tabela singelo_itens_compras encontrada!")
+            
+            # Buscar todos os itens
+            itens = supabase.table("singelo_itens_compras").select("*").order("created_at", desc=True).limit(200).execute()
+            
+            if itens.data:
+                st.markdown(f"### 📊 Total de {len(itens.data)} itens registrados")
+                
+                # Criar DataFrame para melhor visualização
+                import pandas as pd
+                df_itens = []
+                for item in itens.data:
+                    df_itens.append({
+                        "Produto": item['nome_produto'],
+                        "Descrição": item.get('descricao', '-')[:50],
+                        "Quantidade": float(item['quantidade']),
+                        "Valor Unitário": f"R$ {float(item['valor_unitario']):,.2f}",
+                        "Valor Total": f"R$ {float(item['valor_total']):,.2f}",
+                        "Data": datetime.fromisoformat(item['created_at'].replace('Z', '+00:00')).strftime('%d/%m/%Y')
+                    })
+                
+                df = pd.DataFrame(df_itens)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+                
+                # Resumo por produto
+                st.markdown("### 📈 Resumo por Produto")
+                produtos_resumo = {}
+                for item in itens.data:
+                    nome = item['nome_produto']
+                    qtd = float(item['quantidade'])
+                    valor_unit = float(item['valor_unitario'])
+                    valor_total = float(item['valor_total'])
+                    
+                    if nome not in produtos_resumo:
+                        produtos_resumo[nome] = {
+                            "quantidade": 0,
+                            "valor_total": 0,
+                            "compras": 0
+                        }
+                    
+                    produtos_resumo[nome]["quantidade"] += qtd
+                    produtos_resumo[nome]["valor_total"] += valor_total
+                    produtos_resumo[nome]["compras"] += 1
+                
+                # Mostrar resumo
+                for produto, dados in produtos_resumo.items():
+                    valor_medio = dados["valor_total"] / dados["quantidade"] if dados["quantidade"] > 0 else 0
+                    st.markdown(f"""
+                        **{produto}**
+                        - Total comprado: {dados['quantidade']:.2f} unidades
+                        - Valor total gasto: R$ {dados['valor_total']:,.2f}
+                        - Preço médio: R$ {valor_medio:,.2f}
+                        - Número de compras: {dados['compras']}
+                    """)
+                    st.markdown("---")
+            else:
+                st.info("Nenhum item de compra registrado ainda. Comece lançando compras com itens!")
+                
+        except Exception as e:
+            st.warning(f"⚠️ Tabela singelo_itens_compras não encontrada. Crie a tabela conforme instruções acima.")
     
     # ==================== HISTÓRICO ====================
     elif opcao == "📋 Histórico":
