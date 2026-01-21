@@ -775,14 +775,14 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
         # Filtrar parcelas que NÃO são de custos automáticos
         parcelas_normais = [p for p in parcelas.data if p['compra_id'] not in ids_custos_auto] if parcelas.data else []
         
-        # Calcular total de parcelas normais (compras de material parceladas)
-        total_parcelas_normais = sum([float(p['valor_parcela']) for p in parcelas_normais])
+        # Calcular total de parcelas normais (compras de cartão de crédito)
+        total_compras_cartao = sum([float(p['valor_parcela']) for p in parcelas_normais])
         
         # Calcular total de custos automáticos (valor total, não parcela)
         total_custos_auto = sum([float(c['valor_total']) for c in custos_auto])
         
         # Total de compras = parcelas normais + custos automáticos
-        total_compras = total_parcelas_normais + total_custos_auto
+        total_compras = total_compras_cartao + total_custos_auto
         
         total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
         
@@ -795,6 +795,8 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
         
         return {
             "total_compras": total_compras,
+            "total_compras_cartao": total_compras_cartao,
+            "total_custos_auto": total_custos_auto,
             "total_vendas": total_vendas,
             "total_taxa_entrega_cobrada": total_taxa_entrega_cobrada,
             "total_custo_entregador": total_custo_entregador,
@@ -804,6 +806,8 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
     except Exception as e:
         return {
             "total_compras": 0,
+            "total_compras_cartao": 0,
+            "total_custos_auto": 0,
             "total_vendas": 0,
             "total_taxa_entrega_cobrada": 0,
             "total_custo_entregador": 0,
@@ -926,18 +930,26 @@ def main():
         
         resumo = calcular_resumo(supabase, data_inicio_filtro, data_fim_filtro)
         
-        # Linha 1: Vendas e Compras
-        col1, col2, col3 = st.columns(3)
+        # Linha 1: Compras Cartão, Custos Automáticos, Vendas e Lucro
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.markdown(f"""
-                <div class='metric-card'>
-                    <h3>🛒 Total Compras</h3>
-                    <h2>R$ {resumo['total_compras']:,.2f}</h2>
+                <div class='metric-card' style='background: #8B4513;'>
+                    <h3>💳 Compras Cartão</h3>
+                    <h2>R$ {resumo['total_compras_cartao']:,.2f}</h2>
                 </div>
             """, unsafe_allow_html=True)
         
         with col2:
+            st.markdown(f"""
+                <div class='metric-card' style='background: #D2691E;'>
+                    <h3>📝 Custos Box</h3>
+                    <h2>R$ {resumo['total_custos_auto']:,.2f}</h2>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
             st.markdown(f"""
                 <div class='metric-card'>
                     <h3>💰 Total Vendas</h3>
@@ -945,7 +957,7 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
         
-        with col3:
+        with col4:
             lucro_color = "#28A745" if resumo['lucro'] >= 0 else "#DC3545"
             st.markdown(f"""
                 <div class='metric-card' style='background: {lucro_color};'>
