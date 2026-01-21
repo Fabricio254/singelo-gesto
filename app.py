@@ -2113,43 +2113,10 @@ def main():
     # ==================== CUSTOS PRODUTOS ====================
     elif opcao == "📦 Custos Produtos":
         st.markdown("## 📦 Custos dos Produtos")
-        st.info("""
-        💡 **Informação importante:**
-        
-        Para ter o controle de custos por produto, você precisa:
-        
-        1. Criar a tabela **singelo_itens_compras** no Supabase com os campos:
-           - id (int8, primary key, auto-increment)
-           - compra_id (int8, referência para singelo_compras)
-           - nome_produto (text)
-           - descricao (text)
-           - quantidade (numeric)
-           - valor_unitario (numeric)
-           - valor_total (numeric)
-           - created_at (timestamp with time zone, default now())
-        
-        2. Execute o SQL abaixo no Supabase:
-        
-        ```sql
-        CREATE TABLE singelo_itens_compras (
-            id BIGSERIAL PRIMARY KEY,
-            compra_id BIGINT REFERENCES singelo_compras(id) ON DELETE CASCADE,
-            nome_produto TEXT NOT NULL,
-            descricao TEXT,
-            quantidade NUMERIC NOT NULL,
-            valor_unitario NUMERIC NOT NULL,
-            valor_total NUMERIC NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        ```
-        
-        Após criar a tabela, volte aqui para ver os custos dos produtos!
-        """)
         
         # Verificar se a tabela existe tentando fazer uma query
         try:
             teste = supabase.table("singelo_itens_compras").select("id").limit(1).execute()
-            st.success("✅ Tabela singelo_itens_compras encontrada!")
             
             # Buscar todos os itens
             itens = supabase.table("singelo_itens_compras").select("*").order("created_at", desc=True).limit(200).execute()
@@ -2208,7 +2175,39 @@ def main():
                 st.info("Nenhum item de compra registrado ainda. Comece lançando compras com itens!")
                 
         except Exception as e:
-            st.warning(f"⚠️ Tabela singelo_itens_compras não encontrada. Crie a tabela conforme instruções acima.")
+            st.info("""
+            💡 **Informação importante:**
+            
+            Para ter o controle de custos por produto, você precisa:
+            
+            1. Criar a tabela **singelo_itens_compras** no Supabase com os campos:
+               - id (int8, primary key, auto-increment)
+               - compra_id (int8, referência para singelo_compras)
+               - nome_produto (text)
+               - descricao (text)
+               - quantidade (numeric)
+               - valor_unitario (numeric)
+               - valor_total (numeric)
+               - created_at (timestamp with time zone, default now())
+            
+            2. Execute o SQL abaixo no Supabase:
+            
+            ```sql
+            CREATE TABLE singelo_itens_compras (
+                id BIGSERIAL PRIMARY KEY,
+                compra_id BIGINT REFERENCES singelo_compras(id) ON DELETE CASCADE,
+                nome_produto TEXT NOT NULL,
+                descricao TEXT,
+                quantidade NUMERIC NOT NULL,
+                valor_unitario NUMERIC NOT NULL,
+                valor_total NUMERIC NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            ```
+            
+            Após criar a tabela, volte aqui para ver os custos dos produtos!
+            """)
+            st.error(f"⚠️ Erro ao acessar tabela: {str(e)}")
     
     # ==================== HISTÓRICO ====================
     elif opcao == "📋 Histórico":
