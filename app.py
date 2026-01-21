@@ -936,7 +936,7 @@ def main():
         with col1:
             st.markdown(f"""
                 <div class='metric-card' style='background: #8B4513;'>
-                    <h3>💳 Cartão Crédito</h3>
+                    <h3 style='font-size: 1.3rem;'>💳 Cartão Crédito</h3>
                     <h2>R$ {resumo['total_compras_cartao']:,.2f}</h2>
                 </div>
             """, unsafe_allow_html=True)
