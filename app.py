@@ -356,37 +356,71 @@ def extrair_dados_xml_nfe(xml_content):
         # Namespace da NF-e
         ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
         
-        # Extrair valor total
+        # Tentar extrair valor total (com e sem namespace)
         valor_element = root.find('.//nfe:total/nfe:ICMSTot/nfe:vNF', ns)
+        if valor_element is None:
+            valor_element = root.find('.//total/ICMSTot/vNF')
         valor_total = float(valor_element.text) if valor_element is not None else 0.0
         
-        # Extrair data de emissão
+        # Extrair data de emissão (com e sem namespace)
         data_element = root.find('.//nfe:ide/nfe:dhEmi', ns)
+        if data_element is None:
+            data_element = root.find('.//ide/dhEmi')
         if data_element is not None:
-            data_emissao = datetime.fromisoformat(data_element.text.replace('Z', '+00:00'))
+            data_str = data_element.text.replace('Z', '+00:00')
+            try:
+                data_emissao = datetime.fromisoformat(data_str)
+            except:
+                # Tentar outros formatos
+                data_emissao = datetime.now()
         else:
             data_emissao = datetime.now()
         
-        # Extrair nome do fornecedor
+        # Extrair nome do fornecedor (com e sem namespace)
         nome_element = root.find('.//nfe:emit/nfe:xFant', ns)
         if nome_element is None:
             nome_element = root.find('.//nfe:emit/nfe:xNome', ns)
+        if nome_element is None:
+            nome_element = root.find('.//emit/xFant')
+        if nome_element is None:
+            nome_element = root.find('.//emit/xNome')
         nome_fornecedor = nome_element.text if nome_element is not None else "Fornecedor"
         
-        # Extrair número da nota
+        # Extrair número da nota (com e sem namespace)
         nf_element = root.find('.//nfe:ide/nfe:nNF', ns)
+        if nf_element is None:
+            nf_element = root.find('.//ide/nNF')
         numero_nf = nf_element.text if nf_element is not None else ""
         
         # Extrair itens da nota
         itens = []
         det_elements = root.findall('.//nfe:det', ns)
+        if not det_elements:
+            det_elements = root.findall('.//det')
+        
         for det in det_elements:
+            # Tentar com namespace
             prod = det.find('nfe:prod', ns)
+            if prod is None:
+                prod = det.find('prod')
+            
             if prod is not None:
+                # Tentar com namespace primeiro, depois sem
                 nome_prod = prod.find('nfe:xProd', ns)
+                if nome_prod is None:
+                    nome_prod = prod.find('xProd')
+                
                 qtd_prod = prod.find('nfe:qCom', ns)
+                if qtd_prod is None:
+                    qtd_prod = prod.find('qCom')
+                
                 valor_unit = prod.find('nfe:vUnCom', ns)
+                if valor_unit is None:
+                    valor_unit = prod.find('vUnCom')
+                
                 valor_prod = prod.find('nfe:vProd', ns)
+                if valor_prod is None:
+                    valor_prod = prod.find('vProd')
                 
                 # Usar o nome completo como descrição e um nome curto
                 nome_completo = nome_prod.text if nome_prod is not None else "Produto"
