@@ -362,6 +362,12 @@ def extrair_dados_xml_nfe(xml_content):
             if nfe_element is not None:
                 root = nfe_element
         
+        # Se root é NFe, buscar dentro de infNFe
+        if 'NFe' in root.tag:
+            infnfe_element = root.find('{%s}infNFe' % ns_url)
+            if infnfe_element is not None:
+                root = infnfe_element
+        
         # Extrair valor total - buscar diretamente com namespace completo
         valor_element = root.find('.//{%s}vNF' % ns_url)
         if valor_element is None:
