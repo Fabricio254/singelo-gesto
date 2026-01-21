@@ -388,8 +388,11 @@ def extrair_dados_xml_nfe(xml_content):
                 valor_unit = prod.find('nfe:vUnCom', ns)
                 valor_prod = prod.find('nfe:vProd', ns)
                 
+                # Usar o nome completo como descrição e um nome curto
+                nome_completo = nome_prod.text if nome_prod is not None else "Produto"
                 item = {
-                    'produto': nome_prod.text if nome_prod is not None else "Produto",
+                    'nome': nome_completo[:50],  # Nome curto
+                    'descricao': nome_completo,  # Nome completo
                     'quantidade': float(qtd_prod.text) if qtd_prod is not None else 0,
                     'valor_unitario': float(valor_unit.text) if valor_unit is not None else 0,
                     'valor_total': float(valor_prod.text) if valor_prod is not None else 0
@@ -405,12 +408,13 @@ def extrair_dados_xml_nfe(xml_content):
         if itens:
             descricao += "\n\nItens comprados:"
             for i, item in enumerate(itens, 1):
-                descricao += f"\n{i}. {item['produto']} - {item['quantidade']:.0f} un - R$ {item['valor_total']:.2f}"
+                descricao += f"\n{i}. {item['nome']} - {item['quantidade']:.0f} un - R$ {item['valor_total']:.2f}"
         
         return {
             "valor_total": valor_total,
             "data": data_emissao,
             "descricao": descricao,
+            "fornecedor": nome_fornecedor,
             "itens": itens,
             "sucesso": True,
             "mensagem": "XML lido com sucesso!"
