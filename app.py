@@ -353,74 +353,93 @@ def extrair_dados_xml_nfe(xml_content):
         # Parse do XML
         root = ET.fromstring(xml_content)
         
-        # Namespace da NF-e
-        ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
+        # Namespace da NF-e - pode estar declarado como default (sem prefixo)
+        ns_url = 'http://www.portalfiscal.inf.br/nfe'
+        ns = {'nfe': ns_url}
         
-        # Tentar extrair valor total (com e sem namespace)
-        valor_element = root.find('.//nfe:total/nfe:ICMSTot/nfe:vNF', ns)
-        if valor_element is None:
-            valor_element = root.find('.//total/ICMSTot/vNF')
+        # Helper para buscar com múltiplas estratégias
+        def buscar_elemento(caminhos):
+            for caminho in caminhos:
+                elem = root.find(caminho, ns)
+                if elem is not None:
+                    return elem
+            return None
+        
+        # Extrair valor total
+        valor_element = buscar_elemento([
+            './/nfe:total/nfe:ICMSTot/nfe:vNF',
+            './/{%s}total/{%s}ICMSTot/{%s}vNF' % (ns_url, ns_url, ns_url),
+            './/total/ICMSTot/vNF'
+        ])
         valor_total = float(valor_element.text) if valor_element is not None else 0.0
         
-        # Extrair data de emissão (com e sem namespace)
-        data_element = root.find('.//nfe:ide/nfe:dhEmi', ns)
-        if data_element is None:
-            data_element = root.find('.//ide/dhEmi')
+        # Extrair data de emissão
+        data_element = buscar_elemento([
+            './/nfe:ide/nfe:dhEmi',
+            './/{%s}ide/{%s}dhEmi' % (ns_url, ns_url),
+            './/ide/dhEmi'
+        ])
         if data_element is not None:
             data_str = data_element.text.replace('Z', '+00:00')
             try:
                 data_emissao = datetime.fromisoformat(data_str)
             except:
-                # Tentar outros formatos
                 data_emissao = datetime.now()
         else:
             data_emissao = datetime.now()
         
-        # Extrair nome do fornecedor (com e sem namespace)
-        nome_element = root.find('.//nfe:emit/nfe:xFant', ns)
+        # Extrair nome do fornecedor
+        nome_element = buscar_elemento([
+            './/nfe:emit/nfe:xFant',
+            './/{%s}emit/{%s}xFant' % (ns_url, ns_url),
+            './/emit/xFant'
+        ])
         if nome_element is None:
-            nome_element = root.find('.//nfe:emit/nfe:xNome', ns)
-        if nome_element is None:
-            nome_element = root.find('.//emit/xFant')
-        if nome_element is None:
-            nome_element = root.find('.//emit/xNome')
+            nome_element = buscar_elemento([
+                './/nfe:emit/nfe:xNome',
+                './/{%s}emit/{%s}xNome' % (ns_url, ns_url),
+                './/emit/xNome'
+            ])
         nome_fornecedor = nome_element.text if nome_element is not None else "Fornecedor"
         
-        # Extrair número da nota (com e sem namespace)
-        nf_element = root.find('.//nfe:ide/nfe:nNF', ns)
-        if nf_element is None:
-            nf_element = root.find('.//ide/nNF')
+        # Extrair número da nota
+        nf_element = buscar_elemento([
+            './/nfe:ide/nfe:nNF',
+            './/{%s}ide/{%s}nNF' % (ns_url, ns_url),
+            './/ide/nNF'
+        ])
         numero_nf = nf_element.text if nf_element is not None else ""
         
         # Extrair itens da nota
         itens = []
+        # Tentar múltiplas estratégias para encontrar os itens
         det_elements = root.findall('.//nfe:det', ns)
+        if not det_elements:
+            det_elements = root.findall('.//{%s}det' % ns_url)
         if not det_elements:
             det_elements = root.findall('.//det')
         
         for det in det_elements:
-            # Tentar com namespace
+            # Buscar elemento prod
             prod = det.find('nfe:prod', ns)
+            if prod is None:
+                prod = det.find('{%s}prod' % ns_url)
             if prod is None:
                 prod = det.find('prod')
             
             if prod is not None:
-                # Tentar com namespace primeiro, depois sem
-                nome_prod = prod.find('nfe:xProd', ns)
-                if nome_prod is None:
-                    nome_prod = prod.find('xProd')
+                # Buscar subelementos do produto
+                def buscar_no_prod(tags):
+                    for tag in tags:
+                        elem = prod.find(tag)
+                        if elem is not None:
+                            return elem
+                    return None
                 
-                qtd_prod = prod.find('nfe:qCom', ns)
-                if qtd_prod is None:
-                    qtd_prod = prod.find('qCom')
-                
-                valor_unit = prod.find('nfe:vUnCom', ns)
-                if valor_unit is None:
-                    valor_unit = prod.find('vUnCom')
-                
-                valor_prod = prod.find('nfe:vProd', ns)
-                if valor_prod is None:
-                    valor_prod = prod.find('vProd')
+                nome_prod = buscar_no_prod(['nfe:xProd', '{%s}xProd' % ns_url, 'xProd'])
+                qtd_prod = buscar_no_prod(['nfe:qCom', '{%s}qCom' % ns_url, 'qCom'])
+                valor_unit = buscar_no_prod(['nfe:vUnCom', '{%s}vUnCom' % ns_url, 'vUnCom'])
+                valor_prod = buscar_no_prod(['nfe:vProd', '{%s}vProd' % ns_url, 'vProd'])
                 
                 # Usar o nome completo como descrição e um nome curto
                 nome_completo = nome_prod.text if nome_prod is not None else "Produto"
