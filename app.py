@@ -1162,59 +1162,197 @@ def main():
         st.markdown("## 🛒 Lançar Nova Compra")
         
         # Tabs para escolher entre manual, XML e chave de acesso
-        tab1, tab2, tab3 = st.tabs(["✍então a logica é o seguinte, ️ Digitar Manualmente", "📄 Importar XML", "🔑 Buscar por Chave"])
+        tab1, tab2, tab3 = st.tabs(["✍️ Digitar Manualmente", "📄 Importar Documento", "🔑 Buscar por Chave"])
         
         with tab1:
-            with st.form("form_compra"):
-                st.markdown("### Informações da Compra")
+            st.markdown("### ✍️ Cadastro Manual de Compra")
+            
+            # Inicializar session state para itens
+            if 'itens_compra' not in st.session_state:
+                st.session_state.itens_compra = []
+            
+            # Fornecedor
+            fornecedor = st.text_input("🏪 Fornecedor", placeholder="Nome do fornecedor (opcional)")
+            
+            st.markdown("#### 📦 Adicionar Itens da Compra")
+            
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+            with col1:
+                nome_item = st.text_input("Nome do Item", key="nome_item_manual", placeholder="Ex: Chocolate Meio Amargo 500g")
+            with col2:
+                qtd_item = st.number_input("Quantidade", min_value=0.01, value=1.0, step=0.01, key="qtd_item_manual")
+            with col3:
+                valor_unit_item = st.number_input("Valor Unitário (R$)", min_value=0.01, value=1.0, step=0.01, key="valor_unit_manual", format="%.2f")
+            with col4:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("➕ Adicionar", key="btn_add_item_manual", use_container_width=True):
+                    if nome_item:
+                        item = {
+                            'nome': nome_item,
+                            'descricao': '',
+                            'quantidade': qtd_item,
+                            'valor_unitario': valor_unit_item,
+                            'valor_total': qtd_item * valor_unit_item
+                        }
+                        st.session_state.itens_compra.append(item)
+                        st.success(f"✅ Item '{nome_item}' adicionado!")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ Digite o nome do item")
+            
+            # Mostrar itens adicionados
+            if st.session_state.itens_compra:
+                st.markdown("---")
+                st.markdown("### 🛒 Itens Adicionados")
                 
-                valor = st.number_input(
-                    "💵 Valor Total da Compra (R$)",
-                    min_value=0.01,
-                    value=0.01,
-                    step=0.01,
-                    format="%.2f"
-                )
+                total_compra = 0
+                for idx, item in enumerate(st.session_state.itens_compra):
+                    col1, col2, col3, col4, col5 = st.columns([3, 1, 2, 2, 1])
+                    with col1:
+                        st.write(f"**{item['nome']}**")
+                    with col2:
+                        st.write(f"{item['quantidade']:.2f} un")
+                    with col3:
+                        st.write(f"R$ {item['valor_unitario']:.2f}")
+                    with col4:
+                        st.write(f"**R$ {item['valor_total']:.2f}**")
+                    with col5:
+                        if st.button("🗑️", key=f"del_item_{idx}", use_container_width=True):
+                            st.session_state.itens_compra.pop(idx)
+                            st.rerun()
+                    
+                    total_compra += item['valor_total']
                 
-                descricao = st.text_area(
-                    "📝 Descrição (opcional)",
-                    placeholder="Ex: Compra de materiais, embalagens, ingredientes..."
-                )
+                st.markdown("---")
+                st.markdown(f"### 💰 Valor Total: R$ {total_compra:,.2f}")
                 
+                # Opções de pagamento
                 num_parcelas = st.selectbox(
                     "💳 Número de Parcelas",
                     options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
                     format_func=lambda x: f"{x}x" if x > 1 else "À vista",
-                    help="Selecione em quantas parcelas a compra será dividida"
+                    key="parcelas_manual"
                 )
                 
-                # Mostrar valor das parcelas
                 if num_parcelas > 1:
-                    valor_parcela = valor / num_parcelas
+                    valor_parcela = total_compra / num_parcelas
                     st.info(f"💰 Valor de cada parcela: R$ {valor_parcela:,.2f}")
                 
-                submitted = st.form_submit_button("✅ Registrar Compra", use_container_width=True)
-            
-            if submitted:
-                if valor > 0:
+                descricao_manual = st.text_area("📝 Observações (opcional)", key="obs_manual", placeholder="Informações adicionais sobre a compra...")
+                
+                # Botão para registrar
+                if st.button("✅ Registrar Compra com Itens", type="primary", use_container_width=True, key="btn_registrar_manual"):
                     try:
-                        inserir_compra(supabase, valor, descricao, num_parcelas=num_parcelas)
-                        parcelas_info = f"{num_parcelas}x de R$ {valor/num_parcelas:,.2f}" if num_parcelas > 1 else "à vista"
+                        inserir_compra_com_itens(supabase, total_compra, descricao_manual, st.session_state.itens_compra, None, num_parcelas, fornecedor)
+                        parcelas_info = f"{num_parcelas}x de R$ {total_compra/num_parcelas:,.2f}" if num_parcelas > 1 else "à vista"
                         st.markdown(f"""
                             <div class='success-message'>
                                 ✅ <strong>Compra registrada com sucesso!</strong><br>
-                                Valor: R$ {valor:,.2f} ({parcelas_info})
+                                {len(st.session_state.itens_compra)} itens cadastrados<br>
+                                Valor: R$ {total_compra:,.2f} ({parcelas_info})
                             </div>
                         """, unsafe_allow_html=True)
+                        st.session_state.itens_compra = []
                         st.balloons()
+                        st.rerun()
                     except Exception as e:
                         st.error(f"❌ Erro ao registrar compra: {str(e)}")
-                else:
-                    st.warning("⚠️ O valor deve ser maior que zero")
+            else:
+                st.info("📋 Adicione itens à compra usando o formulário acima")
         
         with tab2:
-            st.markdown("### 📄 Importar XML da Nota Fiscal")
-            st.info("💡 **Como obter o XML:** Escaneie o QR Code do cupom fiscal com seu celular e faça o download do arquivo XML")
+            st.markdown("### 📄 Importar Documento Fiscal XML")
+            
+            # Sub-tabs para NF-e e Cupom
+            subtab1, subtab2 = st.tabs(["📄 NF-e (Nota Fiscal)", "🧾 Cupom Fiscal (NFC-e)"])
+            
+            with subtab1:
+                st.info("💡 **NF-e:** Nota Fiscal Eletrônica completa. Geralmente usada em compras de fornecedores.")
+                
+                uploaded_nfe = st.file_uploader(
+                    "Selecione o arquivo XML da NF-e",
+                    type=['xml'],
+                    help="Faça upload do arquivo XML da Nota Fiscal Eletrônica",
+                    key="nfe_upload"
+                )
+                
+                if uploaded_nfe is not None:
+                    try:
+                        xml_content = uploaded_nfe.read()
+                        
+                        with st.spinner("Processando NF-e..."):
+                            dados = extrair_dados_xml_nfe(xml_content)
+                        
+                        if dados['sucesso']:
+                            st.success(dados['mensagem'])
+                            
+                            # Mostrar dados extraídos
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("💵 Valor Total", f"R$ {dados['valor_total']:,.2f}")
+                            with col2:
+                                st.metric("📅 Data", dados['data'].strftime('%d/%m/%Y'))
+                            with col3:
+                                st.metric("🏪 Fornecedor", dados.get('fornecedor', 'N/A'))
+                            
+                            # Mostrar itens
+                            if dados.get('itens'):
+                                st.markdown("### 🛒 Produtos da NF-e")
+                                st.markdown(f"**Total de itens:** {len(dados['itens'])}")
+                                
+                                import pandas as pd
+                                df_itens = pd.DataFrame(dados['itens'])
+                                df_itens['Quantidade'] = df_itens['quantidade'].apply(lambda x: f"{x:.2f}")
+                                df_itens['Valor Unit.'] = df_itens['valor_unitario'].apply(lambda x: f"R$ {x:.2f}")
+                                df_itens['Valor Total'] = df_itens['valor_total'].apply(lambda x: f"R$ {x:.2f}")
+                                df_itens = df_itens[['nome', 'descricao', 'Quantidade', 'Valor Unit.', 'Valor Total']]
+                                df_itens.columns = ['Produto', 'Descrição', 'Quantidade', 'Valor Unit.', 'Valor Total']
+                                
+                                st.dataframe(df_itens, use_container_width=True, hide_index=True)
+                            
+                            st.markdown("---")
+                            
+                            # Opções de pagamento
+                            num_parcelas_nfe = st.selectbox(
+                                "💳 Número de Parcelas",
+                                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                                format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                                key="parcelas_nfe"
+                            )
+                            
+                            if num_parcelas_nfe > 1:
+                                st.info(f"💰 Valor de cada parcela: R$ {dados['valor_total']/num_parcelas_nfe:,.2f}")
+                            
+                            # Botão confirmar
+                            if st.button("✅ Confirmar e Registrar NF-e", type="primary", use_container_width=True, key="btn_confirmar_nfe"):
+                                try:
+                                    descricao_nfe = f"NF-e - {dados.get('fornecedor', 'Fornecedor não identificado')}"
+                                    inserir_compra_com_itens(supabase, dados['valor_total'], descricao_nfe, dados.get('itens', []), dados['data'], num_parcelas_nfe, dados.get('fornecedor', ''))
+                                    st.markdown(f"""
+                                        <div class='success-message'>
+                                            ✅ <strong>NF-e importada com sucesso!</strong><br>
+                                            Fornecedor: {dados.get('fornecedor', 'N/A')}<br>
+                                            {len(dados.get('itens', []))} produtos cadastrados<br>
+                                            Valor: R$ {dados['valor_total']:,.2f}
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                                    st.balloons()
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao registrar: {str(e)}")
+                        else:
+                            st.error(dados['mensagem'])
+                    except Exception as e:
+                        st.error(f"❌ Erro ao processar NF-e: {str(e)}")
+            
+            with subtab2:
+                st.info("💡 **Cupom Fiscal:** Nota fiscal simplificada. Escaneie o QR Code do cupom para obter o XML.")
+                
+                uploaded_cupom = st.file_uploader(
+                    "Selecione o arquivo XML do Cupom",
+                    type=['xml'],
+                    help="Faça upload do arquivo XML obtido via QR Code",
+                    key="cupom_upload"
+                )
             
             uploaded_file = st.file_uploader(
                 "Selecione o arquivo XML",
