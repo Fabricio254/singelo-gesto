@@ -1340,6 +1340,9 @@ def main():
                         with st.spinner("Processando NF-e..."):
                             dados = extrair_dados_xml_nfe(xml_content)
                         
+                        # DEBUG - remover depois
+                        st.write("DEBUG - Dados extraídos:", dados)
+                        
                         if dados['sucesso']:
                             st.success(dados['mensagem'])
                             
