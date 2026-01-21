@@ -1353,105 +1353,75 @@ def main():
                     help="Faça upload do arquivo XML obtido via QR Code",
                     key="cupom_upload"
                 )
-            
-            uploaded_file = st.file_uploader(
-                "Selecione o arquivo XML",
-                type=['xml'],
-                help="Faça upload do arquivo XML da NF-e",
-                key="xml_upload"
-            )
-            
-            if uploaded_file is not None:
-                try:
-                    # Ler conteúdo do arquivo
-                    xml_content = uploaded_file.read()
-                    
-                    # Verificar se é HTML (DANFE) ou XML
-                    content_str = xml_content.decode('utf-8', errors='ignore') if isinstance(xml_content, bytes) else xml_content
-                    
-                    if '<!DOCTYPE html>' in content_str or '<html' in content_str:
-                        # É um HTML do DANFE, extrair dados do HTML
-                        dados = extrair_dados_html_nfce(xml_content)
-                    else:
-                        # É XML, processar normalmente
-                        dados = extrair_dados_xml_nfe(xml_content)
-                    
-                    if dados['sucesso']:
-                        st.success(dados['mensagem'])
+                
+                if uploaded_cupom is not None:
+                    try:
+                        xml_content = uploaded_cupom.read()
+                        content_str = xml_content.decode('utf-8', errors='ignore') if isinstance(xml_content, bytes) else xml_content
                         
-                        # Mostrar dados extraídos
-                        st.markdown("### 📊 Dados Extraídos do XML")
-                        col1, col2, col3 = st.columns(3)
+                        with st.spinner("Processando Cupom Fiscal..."):
+                            if '<!DOCTYPE html>' in content_str or '<html' in content_str:
+                                dados = extrair_dados_html_nfce(xml_content)
+                            else:
+                                dados = extrair_dados_xml_nfe(xml_content)
                         
-                        with col1:
-                            st.metric("💵 Valor Total", f"R$ {dados['valor_total']:,.2f}")
-                        with col2:
-                            st.metric("📅 Data", dados['data'].strftime('%d/%m/%Y'))
-                        with col3:
-                            st.metric("🏪 Fornecedor", dados['descricao'].split(' - ')[0].replace('Compra ', ''))
-                        
-                        st.info(f"📝 Descrição: {dados['descricao']}")
-                        
-                        # Mostrar itens da nota fiscal
-                        st.markdown("---")
-                        st.markdown("### 🛒 Itens da Nota Fiscal")
-                        
-                        if dados.get('itens') and len(dados['itens']) > 0:
-                            st.markdown(f"**Total de itens:** {len(dados['itens'])}")
+                        if dados['sucesso']:
+                            st.success(dados['mensagem'])
                             
-                            # Criar DataFrame com os itens
-                            df_itens = pd.DataFrame(dados['itens'])
-                            df_itens['quantidade'] = df_itens['quantidade'].apply(lambda x: f"{x:.2f}")
-                            df_itens['valor_unitario'] = df_itens['valor_unitario'].apply(lambda x: f"R$ {x:.2f}")
-                            df_itens['valor_total'] = df_itens['valor_total'].apply(lambda x: f"R$ {x:.2f}")
+                            # Mostrar dados
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("💵 Valor Total", f"R$ {dados['valor_total']:,.2f}")
+                            with col2:
+                                st.metric("📅 Data", dados['data'].strftime('%d/%m/%Y'))
                             
-                            # Renomear colunas
-                            df_itens.columns = ['Produto', 'Quantidade', 'Valor Unit.', 'Valor Total']
+                            # Mostrar itens se houver
+                            if dados.get('itens'):
+                                st.markdown("### 🛒 Itens do Cupom")
+                                st.markdown(f"**Total de itens:** {len(dados['itens'])}")
+                                
+                                import pandas as pd
+                                df_itens = pd.DataFrame(dados['itens'])
+                                df_itens['Quantidade'] = df_itens['quantidade'].apply(lambda x: f"{x:.2f}")
+                                df_itens['Valor Unit.'] = df_itens['valor_unitario'].apply(lambda x: f"R$ {x:.2f}")
+                                df_itens['Valor Total'] = df_itens['valor_total'].apply(lambda x: f"R$ {x:.2f}")
+                                df_itens = df_itens[['nome', 'Quantidade', 'Valor Unit.', 'Valor Total']]
+                                df_itens.columns = ['Produto', 'Quantidade', 'Valor Unit.', 'Valor Total']
+                                
+                                st.dataframe(df_itens, use_container_width=True, hide_index=True)
                             
-                            # Mostrar tabela
-                            st.dataframe(df_itens, use_container_width=True, hide_index=True)
+                            st.markdown("---")
+                            
+                            # Opções de pagamento
+                            num_parcelas_cupom = st.selectbox(
+                                "💳 Número de Parcelas",
+                                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                                format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                                key="parcelas_cupom"
+                            )
+                            
+                            if num_parcelas_cupom > 1:
+                                st.info(f"💰 Valor de cada parcela: R$ {dados['valor_total']/num_parcelas_cupom:,.2f}")
+                            
+                            # Botão confirmar
+                            if st.button("✅ Confirmar e Registrar Cupom", type="primary", use_container_width=True, key="btn_confirmar_cupom"):
+                                try:
+                                    descricao_cupom = f"Cupom Fiscal - {dados.get('descricao', 'Compra')}"
+                                    inserir_compra_com_itens(supabase, dados['valor_total'], descricao_cupom, dados.get('itens', []), dados['data'], num_parcelas_cupom, "")
+                                    st.markdown(f"""
+                                        <div class='success-message'>
+                                            ✅ <strong>Cupom importado com sucesso!</strong><br>
+                                            {len(dados.get('itens', []))} itens cadastrados<br>
+                                            Valor: R$ {dados['valor_total']:,.2f}
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                                    st.balloons()
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao registrar: {str(e)}")
                         else:
-                            st.warning("⚠️ Não foi possível extrair os itens do arquivo. Verifique se o formato está correto.")
-                            st.info("💡 **Dica:** Alguns cupons fiscais em HTML podem não conter os detalhes dos produtos. Tente fazer o download do XML puro através do QR Code.")
-                        
-                        st.markdown("---")
-                        
-                        # Campo para selecionar parcelas
-                        num_parcelas_xml = st.selectbox(
-                            "💳 Número de Parcelas",
-                            options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-                            format_func=lambda x: f"{x}x" if x > 1 else "À vista",
-                            help="Selecione em quantas parcelas a compra será dividida",
-                            key="parcelas_xml"
-                        )
-                        
-                        if num_parcelas_xml > 1:
-                            valor_parcela = dados['valor_total'] / num_parcelas_xml
-                            st.info(f"💰 Valor de cada parcela: R$ {valor_parcela:,.2f}")
-                        
-                        # Botão para confirmar importação
-                        if st.button("✅ Confirmar e Registrar Compra", use_container_width=True, type="primary", key="btn_confirmar_xml"):
-                            try:
-                                inserir_compra(supabase, dados['valor_total'], dados['descricao'], dados['data'], num_parcelas_xml)
-                                parcelas_info = f"{num_parcelas_xml}x de R$ {dados['valor_total']/num_parcelas_xml:,.2f}" if num_parcelas_xml > 1 else "à vista"
-                                st.markdown(f"""
-                                    <div class='success-message'>
-                                        ✅ <strong>Compra importada e registrada com sucesso!</strong><br>
-                                        Fornecedor: {dados['descricao']}<br>
-                                        Valor: R$ {dados['valor_total']:,.2f} ({parcelas_info})<br>
-                                        Data: {dados['data'].strftime('%d/%m/%Y %H:%M')}
-                                    </div>
-                                """, unsafe_allow_html=True)
-                                st.balloons()
-                            except Exception as e:
-                                st.error(f"❌ Erro ao registrar compra: {str(e)}")
-                    else:
-                        st.error(dados['mensagem'])
-                        st.warning("⚠️ Verifique se o arquivo é um XML válido de NF-e")
-                        
-                except Exception as e:
-                    st.error(f"❌ Erro ao processar arquivo: {str(e)}")
-                    st.warning("⚠️ Certifique-se de que o arquivo é um XML válido de Nota Fiscal Eletrônica")
+                            st.error(dados['mensagem'])
+                    except Exception as e:
+                        st.error(f"❌ Erro ao processar cupom: {str(e)}")
         
         with tab3:
             st.markdown("### 🔑 Buscar XML pela Chave de Acesso")
