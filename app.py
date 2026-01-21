@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 from datetime import datetime
 from supabase import create_client, Client
 import pandas as pd
@@ -859,7 +859,7 @@ def main():
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
             "Selecione uma opção:",
-            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "� Custos Produtos", "�📋 Histórico"],
+            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "📦 Custos Produtos", "📋 Histórico"],
             label_visibility="collapsed"
         )
         
