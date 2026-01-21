@@ -1425,14 +1425,13 @@ def main():
         
         with tab3:
             st.markdown("### 🔑 Buscar e Importar NF-e")
-            st.info("💡 Digite a chave de 44 dígitos - tentaremos buscar automaticamente da SEFAZ")
+            st.info("💡 Digite ou cole a chave de 44 dígitos - tentaremos buscar automaticamente da SEFAZ")
             
-            # Campo para digitar a chave
+            # Campo para digitar ou colar a chave
             chave_acesso = st.text_input(
                 "Chave de Acesso (44 dígitos)",
-                max_chars=44,
                 placeholder="Ex: 35240112345678901234550010000123451234567890",
-                help="Digite apenas números, sem espaços ou caracteres especiais",
+                help="Digite ou cole a chave - pode conter espaços que serão removidos automaticamente",
                 key="chave_acesso_input"
             )
             
