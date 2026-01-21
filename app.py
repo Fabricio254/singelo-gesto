@@ -497,8 +497,11 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
     result = supabase.table("singelo_compras").insert(data).execute()
     compra_id = result.data[0]['id']
     
-    # Criar parcelas com vencimento sempre no dia 12
-    if num_parcelas > 1:
+    # Criar parcelas com vencimento sempre no dia 12 (apenas se num_parcelas > 0)
+    if num_parcelas == 0:
+        # Não criar parcelas - compra foi paga à vista
+        pass
+    elif num_parcelas > 1:
         # Se a compra foi feita após o dia 12, começar no próximo mês
         meses_adicionar = 1 if data_base.day > 12 else 0
         
@@ -1363,28 +1366,48 @@ def main():
                             
                             st.markdown("---")
                             
-                            # Opções de pagamento
-                            num_parcelas_nfe = st.selectbox(
-                                "💳 Número de Parcelas",
-                                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-                                format_func=lambda x: f"{x}x" if x > 1 else "À vista",
-                                key="parcelas_nfe"
+                            # Perguntar se gera contas a pagar
+                            st.markdown("### 💳 Forma de Pagamento")
+                            gerar_parcelas = st.radio(
+                                "Esta compra vai para o Contas a Pagar?",
+                                ["Sim, gerar parcelas no cartão de crédito", "Não, foi pago à vista (dinheiro/PIX/outro)"],
+                                key="gerar_parcelas_nfe",
+                                help="Escolha 'Sim' se for parcelado no cartão de crédito. Escolha 'Não' se já foi pago."
                             )
                             
-                            if num_parcelas_nfe > 1:
-                                st.info(f"💰 Valor de cada parcela: R$ {dados['valor_total']/num_parcelas_nfe:,.2f}")
+                            num_parcelas_nfe = 1
+                            if gerar_parcelas == "Sim, gerar parcelas no cartão de crédito":
+                                # Opções de pagamento
+                                num_parcelas_nfe = st.selectbox(
+                                    "💳 Número de Parcelas",
+                                    options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                                    format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                                    key="parcelas_nfe"
+                                )
+                                
+                                if num_parcelas_nfe > 1:
+                                    st.info(f"💰 Valor de cada parcela: R$ {dados['valor_total']/num_parcelas_nfe:,.2f}")
+                            else:
+                                st.info("ℹ️ A compra será registrada sem gerar parcelas no contas a pagar.")
                             
                             # Botão confirmar
                             if st.button("✅ Confirmar e Registrar NF-e", type="primary", use_container_width=True, key="btn_confirmar_nfe"):
                                 try:
                                     descricao_nfe = f"NF-e - {dados.get('fornecedor', 'Fornecedor não identificado')}"
-                                    inserir_compra_com_itens(supabase, dados['valor_total'], descricao_nfe, dados.get('itens', []), dados['data'], num_parcelas_nfe, dados.get('fornecedor', ''))
+                                    
+                                    # Se não gerar parcelas, passa 0 para num_parcelas
+                                    parcelas_final = num_parcelas_nfe if gerar_parcelas == "Sim, gerar parcelas no cartão de crédito" else 0
+                                    
+                                    inserir_compra_com_itens(supabase, dados['valor_total'], descricao_nfe, dados.get('itens', []), dados['data'], parcelas_final, dados.get('fornecedor', ''))
+                                    
+                                    msg_parcelas = f"{parcelas_final}x no cartão de crédito" if parcelas_final > 0 else "Pago à vista (sem parcelas)"
                                     st.markdown(f"""
                                         <div class='success-message'>
                                             ✅ <strong>NF-e importada com sucesso!</strong><br>
                                             Fornecedor: {dados.get('fornecedor', 'N/A')}<br>
                                             {len(dados.get('itens', []))} produtos cadastrados<br>
-                                            Valor: R$ {dados['valor_total']:,.2f}
+                                            Valor: R$ {dados['valor_total']:,.2f}<br>
+                                            Pagamento: {msg_parcelas}
                                         </div>
                                     """, unsafe_allow_html=True)
                                     st.balloons()
