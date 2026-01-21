@@ -316,8 +316,8 @@ def extrair_dados_html_nfce(html_content):
             "mensagem": f"Erro ao extrair dados do HTML: {str(e)}"
         }
 
-def extrair_dados_xml_nfe(xml_content):
-    """Extrai dados relevantes do XML da NF-e - v2.0"""
+def extrair_dados_xml_nfe_v2(xml_content):
+    """Extrai dados relevantes do XML da NF-e - VERSAO 2.1 FORCADA"""
     debug_info = []  # Para rastrear o processo
     try:
         # Se for bytes, decodificar
@@ -483,7 +483,8 @@ def extrair_dados_xml_nfe(xml_content):
             "descricao": "",
             "itens": [],
             "sucesso": False,
-            "mensagem": f"Erro ao processar XML: Formato inválido. Tente salvar o XML novamente usando 'Exibir código-fonte' na página da SEFAZ."
+            "mensagem": f"Erro ao processar XML: Formato inválido. Tente salvar o XML novamente usando 'Exibir código-fonte' na página da SEFAZ.",
+            "debug": f"ParseError: {str(e)}"
         }
     except Exception as e:
         return {
@@ -492,7 +493,8 @@ def extrair_dados_xml_nfe(xml_content):
             "descricao": "",
             "itens": [],
             "sucesso": False,
-            "mensagem": f"Erro ao ler XML: {str(e)}"
+            "mensagem": f"Erro ao ler XML: {str(e)}",
+            "debug": f"Exception: {type(e).__name__} - {str(e)}"
         }
 
 def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", data_compra=None, num_parcelas: int = 1):
@@ -1345,7 +1347,8 @@ def main():
                         st.info(f"📄 Arquivo: {uploaded_nfe.name} - Tamanho: {len(xml_content)} bytes")
                         
                         with st.spinner("Processando NF-e..."):
-                            dados = extrair_dados_xml_nfe(xml_content)
+                            # FORÇAR RELOAD - usar função nova
+                            dados = extrair_dados_xml_nfe_v2(xml_content)
                         
                         # DEBUG: Mostrar resultado
                         st.json({
