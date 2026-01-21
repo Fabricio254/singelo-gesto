@@ -511,6 +511,125 @@ def inserir_compra(supabase: Client, valor_total: float, descricao: str = "", da
     
     return result
 
+def inserir_itens_compra(supabase: Client, compra_id: int, itens: list):
+    """Insere os itens individuais de uma compra na tabela de itens"""
+    try:
+        for item in itens:
+            item_data = {
+                "compra_id": compra_id,
+                "nome_produto": item.get('nome', ''),
+                "descricao": item.get('descricao', ''),
+                "quantidade": float(item.get('quantidade', 0)),
+                "valor_unitario": float(item.get('valor_unitario', 0)),
+                "valor_total": float(item.get('valor_total', 0))
+            }
+            supabase.table("singelo_itens_compras").insert(item_data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao inserir itens: {str(e)}")
+        return False
+
+def inserir_compra_com_itens(supabase: Client, valor_total: float, descricao: str, itens: list, data_compra=None, num_parcelas: int = 1, fornecedor: str = ""):
+    """Insere uma compra com seus itens individuais"""
+    # Adicionar fornecedor à descrição se fornecido
+    if fornecedor:
+        descricao = f"Fornecedor: {fornecedor}\n{descricao}"
+    
+    # Inserir a compra
+    result = inserir_compra(supabase, valor_total, descricao, data_compra, num_parcelas)
+    compra_id = result.data[0]['id']
+    
+    # Inserir os itens
+    if itens:
+        inserir_itens_compra(supabase, compra_id, itens)
+    
+    return result
+
+def extrair_dados_xml_nfe(xml_content):
+    """Extrai dados de uma NF-e (Nota Fiscal Eletrônica) completa"""
+    try:
+        import xml.etree.ElementTree as ET
+        
+        # Parse do XML
+        if isinstance(xml_content, bytes):
+            root = ET.fromstring(xml_content.decode('utf-8'))
+        else:
+            root = ET.fromstring(xml_content)
+        
+        # Namespace da NF-e
+        ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
+        
+        # Buscar informações da nota
+        inf_nfe = root.find('.//nfe:infNFe', ns)
+        if not inf_nfe:
+            # Tentar sem namespace
+            inf_nfe = root.find('.//infNFe')
+        
+        # Extrair fornecedor
+        fornecedor = ""
+        emit = root.find('.//nfe:emit', ns) or root.find('.//emit')
+        if emit:
+            nome_emit = emit.find('.//nfe:xNome', ns) or emit.find('.//xNome')
+            if nome_emit is not None:
+                fornecedor = nome_emit.text
+        
+        # Extrair produtos
+        itens = []
+        produtos = root.findall('.//nfe:det', ns) or root.findall('.//det')
+        
+        for produto in produtos:
+            prod = produto.find('.//nfe:prod', ns) or produto.find('.//prod')
+            if prod:
+                nome = prod.find('.//nfe:xProd', ns) or prod.find('.//xProd')
+                quantidade = prod.find('.//nfe:qCom', ns) or prod.find('.//qCom')
+                valor_unit = prod.find('.//nfe:vUnCom', ns) or prod.find('.//vUnCom')
+                codigo = prod.find('.//nfe:cProd', ns) or prod.find('.//cProd')
+                
+                if nome is not None and quantidade is not None and valor_unit is not None:
+                    qtd = float(quantidade.text)
+                    v_unit = float(valor_unit.text)
+                    
+                    itens.append({
+                        'nome': nome.text,
+                        'descricao': f"Cód: {codigo.text if codigo is not None else 'N/A'}",
+                        'quantidade': qtd,
+                        'valor_unitario': v_unit,
+                        'valor_total': qtd * v_unit
+                    })
+        
+        # Calcular valor total
+        valor_total = sum([item['valor_total'] for item in itens])
+        
+        # Extrair data da nota
+        data_emissao = datetime.now()
+        dh_emit = root.find('.//nfe:dhEmi', ns) or root.find('.//dhEmi')
+        if dh_emit is not None:
+            try:
+                data_emissao = datetime.fromisoformat(dh_emit.text.replace('Z', '+00:00'))
+            except:
+                pass
+        
+        return {
+            "sucesso": True,
+            "mensagem": f"NF-e processada com sucesso! {len(itens)} produtos encontrados.",
+            "valor_total": valor_total,
+            "fornecedor": fornecedor,
+            "data": data_emissao,
+            "itens": itens,
+            "tipo_documento": "NF-e"
+        }
+        
+    except Exception as e:
+        return {
+            "sucesso": False,
+            "mensagem": f"Erro ao processar NF-e: {str(e)}",
+            "valor_total": 0,
+            "fornecedor": "",
+            "data": datetime.now(),
+            "itens": [],
+            "tipo_documento": "NF-e"
+        }
+
 def buscar_parcelas_pendentes(supabase: Client, data_inicio=None, data_fim=None):
     """Busca parcelas com vencimento até o final do período (inclui parcelas futuras do mês)"""
     query = supabase.table("singelo_parcelas_compras").select("*")
