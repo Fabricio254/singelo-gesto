@@ -98,6 +98,10 @@ def apply_custom_style():
             border-radius: 10px;
             text-align: center;
             margin: 10px 0;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         
         h1, h2, h3 {
