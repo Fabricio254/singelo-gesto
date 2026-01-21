@@ -356,8 +356,11 @@ def extrair_dados_xml_nfe(xml_content):
         # Namespace da NF-e
         ns_url = 'http://www.portalfiscal.inf.br/nfe'
         
-        # Registrar namespace para facilitar buscas
-        ET.register_namespace('', ns_url)
+        # Se root é nfeProc, buscar o elemento NFe
+        if 'nfeProc' in root.tag:
+            nfe_element = root.find('{%s}NFe' % ns_url)
+            if nfe_element is not None:
+                root = nfe_element
         
         # Extrair valor total - buscar diretamente com namespace completo
         valor_element = root.find('.//{%s}vNF' % ns_url)
