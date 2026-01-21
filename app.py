@@ -1424,75 +1424,166 @@ def main():
                         st.error(f"❌ Erro ao processar cupom: {str(e)}")
         
         with tab3:
-            st.markdown("### 🔑 Buscar XML pela Chave de Acesso")
-            st.info("💡 **Onde encontrar:** A chave de acesso de 44 dígitos está no rodapé do cupom fiscal")
+            st.markdown("### 🔑 Buscar Nota Fiscal")
+            st.info("💡 **Opções:** Busque pela chave de acesso de 44 dígitos ou cole o XML completo da nota")
             
-            # Campo para digitar a chave
-            chave_acesso = st.text_input(
-                "Digite a Chave de Acesso (44 dígitos)",
-                max_chars=44,
-                placeholder="Ex: 35240112345678901234550010000123451234567890",
-                help="Digite apenas números, sem espaços ou caracteres especiais",
-                key="chave_acesso_input"
+            # Criar duas opções: busca por chave ou cole o XML
+            opcao_busca = st.radio(
+                "Escolha a forma de busca:",
+                ["🔑 Buscar por Chave de Acesso", "📋 Colar XML da NF-e"],
+                key="opcao_busca_nfe"
             )
             
-            # Botão para buscar
-            if st.button("🔍 Buscar XML", use_container_width=True, type="primary", key="btn_buscar_chave"):
-                if chave_acesso:
-                    # Remover espaços e caracteres não numéricos
-                    chave_limpa = ''.join(filter(str.isdigit, chave_acesso))
-                    
-                    with st.spinner("Buscando informações da nota fiscal..."):
-                        resultado = buscar_xml_por_chave(chave_limpa)
-                    
-                    if resultado.get('sucesso'):
-                        st.success(resultado['mensagem'])
+            if opcao_busca == "🔑 Buscar por Chave de Acesso":
+                # Campo para digitar a chave
+                chave_acesso = st.text_input(
+                    "Digite a Chave de Acesso (44 dígitos)",
+                    max_chars=44,
+                    placeholder="Ex: 35240112345678901234550010000123451234567890",
+                    help="Digite apenas números, sem espaços ou caracteres especiais",
+                    key="chave_acesso_input"
+                )
+                
+                # Botão para buscar
+                if st.button("🔍 Buscar XML", use_container_width=True, type="primary", key="btn_buscar_chave"):
+                    if chave_acesso:
+                        # Remover espaços e caracteres não numéricos
+                        chave_limpa = ''.join(filter(str.isdigit, chave_acesso))
                         
-                        # Mostrar informações
-                        st.markdown(f"**🗺️ Estado:** {resultado['uf']}")
-                        st.markdown(f"**🔑 Chave:** {resultado['chave']}")
+                        with st.spinner("Buscando informações da nota fiscal..."):
+                            resultado = buscar_xml_por_chave(chave_limpa)
                         
-                        # Mostrar instruções
-                        if 'instrucoes' in resultado:
-                            st.info(f"📋 **Instruções:**\n\n{resultado['instrucoes']}")
-                        
-                        # Botão para acessar SEFAZ
-                        if 'url' in resultado and resultado['url']:
-                            st.markdown("---")
-                            st.markdown(f"### 🔗 [Clique aqui para acessar a SEFAZ-{resultado['uf']}]({resultado['url']})")
-                            st.markdown(f"**Cole esta chave lá:** `{resultado['chave']}`")
+                        if resultado.get('sucesso'):
+                            st.success(resultado['mensagem'])
                             
-                            # Botão de copiar
-                            if st.button("📋 Copiar Chave", key="copiar_chave"):
-                                st.code(resultado['chave'], language=None)
-                                st.success("✅ Chave copiada! Cole na página da SEFAZ")
-                    else:
-                        st.warning(resultado['mensagem'])
-                        
-                        if 'uf' in resultado:
+                            # Mostrar informações
                             st.markdown(f"**🗺️ Estado:** {resultado['uf']}")
-                        
-                        if 'instrucoes' in resultado:
-                            st.info(f"ℹ️ {resultado['instrucoes']}")
-                        
-                        # Mostrar instruções alternativas
-                        st.markdown("---")
-                        st.markdown("### 📱 Alternativa Recomendada: Use o QR Code")
-                        st.markdown("""
-                        **Passos para obter o XML pelo QR Code:**
-                        1. 📸 Abra a câmera do celular
-                        2. 🎯 Aponte para o QR Code do cupom
-                        3. 🌐 Abrirá um link da SEFAZ
-                        4. 📥 Clique em "Download XML" ou "Baixar XML"
-                        5. 💾 Salve o arquivo
-                        6. ⬆️ Volte aqui e faça upload na aba "Importar XML"
-                        """)
-                        
-                        # Mostrar link se disponível
-                        if 'url' in resultado and resultado['url']:
-                            st.markdown(f"**🔗 Ou acesse diretamente:** [Portal da SEFAZ]({resultado['url']})")
-                else:
-                    st.warning("⚠️ Digite a chave de acesso de 44 dígitos")
+                            st.markdown(f"**🔑 Chave:** {resultado['chave']}")
+                            
+                            # Mostrar instruções
+                            if 'instrucoes' in resultado:
+                                st.info(f"📋 **Instruções:**\n\n{resultado['instrucoes']}")
+                            
+                            # Botão para acessar SEFAZ
+                            if 'url' in resultado and resultado['url']:
+                                st.markdown("---")
+                                st.markdown(f"### 🔗 [Clique aqui para acessar a SEFAZ-{resultado['uf']}]({resultado['url']})")
+                                st.markdown(f"**Cole esta chave lá:** `{resultado['chave']}`")
+                                
+                                # Botão de copiar
+                                if st.button("📋 Copiar Chave", key="copiar_chave"):
+                                    st.code(resultado['chave'], language=None)
+                                    st.success("✅ Chave copiada! Cole na página da SEFAZ")
+                        else:
+                            st.warning(resultado['mensagem'])
+                            
+                            if 'uf' in resultado:
+                                st.markdown(f"**🗺️ Estado:** {resultado['uf']}")
+                            
+                            if 'instrucoes' in resultado:
+                                st.info(f"ℹ️ {resultado['instrucoes']}")
+                            
+                            # Mostrar instruções alternativas
+                            st.markdown("---")
+                            st.markdown("### 📱 Alternativa: Use o QR Code ou Cole o XML")
+                            st.markdown("""
+                            **Opção 1 - QR Code:**
+                            1. 📸 Escaneie o QR Code do cupom
+                            2. 📥 Baixe o XML no site da SEFAZ
+                            3. ⬆️ Faça upload na aba "Importar Documento"
+                            
+                            **Opção 2 - Colar XML:**
+                            Use a opção acima "📋 Colar XML da NF-e"
+                            """)
+                            
+                            # Mostrar link se disponível
+                            if 'url' in resultado and resultado['url']:
+                                st.markdown(f"**🔗 Acesse:** [Portal da SEFAZ]({resultado['url']})")
+                    else:
+                        st.warning("⚠️ Digite a chave de acesso de 44 dígitos")
+            
+            else:  # Colar XML
+                st.markdown("### 📋 Cole o Conteúdo do XML da NF-e")
+                st.info("💡 **Como obter:** Abra o arquivo XML da NF-e com o bloco de notas, copie todo o conteúdo e cole abaixo")
+                
+                xml_colado = st.text_area(
+                    "Cole o XML completo aqui:",
+                    height=200,
+                    placeholder='<?xml version="1.0" encoding="UTF-8"?>...',
+                    key="xml_colado_input"
+                )
+                
+                if st.button("🔄 Processar XML Colado", type="primary", use_container_width=True, key="btn_processar_xml_colado"):
+                    if xml_colado and len(xml_colado) > 100:
+                        try:
+                            with st.spinner("Processando XML..."):
+                                # Tentar processar como NF-e
+                                dados = extrair_dados_xml_nfe(xml_colado.encode('utf-8'))
+                            
+                            if dados['sucesso']:
+                                st.success(dados['mensagem'])
+                                
+                                # Mostrar dados extraídos
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("💵 Valor Total", f"R$ {dados['valor_total']:,.2f}")
+                                with col2:
+                                    st.metric("📅 Data", dados['data'].strftime('%d/%m/%Y'))
+                                with col3:
+                                    st.metric("🏪 Fornecedor", dados.get('fornecedor', 'N/A'))
+                                
+                                # Mostrar itens
+                                if dados.get('itens'):
+                                    st.markdown("### 🛒 Produtos da NF-e")
+                                    st.markdown(f"**Total de itens:** {len(dados['itens'])}")
+                                    
+                                    import pandas as pd
+                                    df_itens = pd.DataFrame(dados['itens'])
+                                    df_itens['Quantidade'] = df_itens['quantidade'].apply(lambda x: f"{x:.2f}")
+                                    df_itens['Valor Unit.'] = df_itens['valor_unitario'].apply(lambda x: f"R$ {x:.2f}")
+                                    df_itens['Valor Total'] = df_itens['valor_total'].apply(lambda x: f"R$ {x:.2f}")
+                                    df_itens = df_itens[['nome', 'descricao', 'Quantidade', 'Valor Unit.', 'Valor Total']]
+                                    df_itens.columns = ['Produto', 'Descrição', 'Quantidade', 'Valor Unit.', 'Valor Total']
+                                    
+                                    st.dataframe(df_itens, use_container_width=True, hide_index=True)
+                                
+                                st.markdown("---")
+                                
+                                # Opções de pagamento
+                                num_parcelas_colado = st.selectbox(
+                                    "💳 Número de Parcelas",
+                                    options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                                    format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                                    key="parcelas_xml_colado"
+                                )
+                                
+                                if num_parcelas_colado > 1:
+                                    st.info(f"💰 Valor de cada parcela: R$ {dados['valor_total']/num_parcelas_colado:,.2f}")
+                                
+                                # Botão confirmar
+                                if st.button("✅ Confirmar e Registrar NF-e", type="primary", use_container_width=True, key="btn_confirmar_xml_colado"):
+                                    try:
+                                        descricao_nfe = f"NF-e - {dados.get('fornecedor', 'Fornecedor não identificado')}"
+                                        inserir_compra_com_itens(supabase, dados['valor_total'], descricao_nfe, dados.get('itens', []), dados['data'], num_parcelas_colado, dados.get('fornecedor', ''))
+                                        st.markdown(f"""
+                                            <div class='success-message'>
+                                                ✅ <strong>NF-e registrada com sucesso!</strong><br>
+                                                Fornecedor: {dados.get('fornecedor', 'N/A')}<br>
+                                                {len(dados.get('itens', []))} produtos cadastrados<br>
+                                                Valor: R$ {dados['valor_total']:,.2f}
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                        st.balloons()
+                                    except Exception as e:
+                                        st.error(f"❌ Erro ao registrar: {str(e)}")
+                            else:
+                                st.error(dados['mensagem'])
+                                st.warning("⚠️ Verifique se o XML está completo e é válido")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao processar XML: {str(e)}")
+                            st.warning("💡 Certifique-se de colar o conteúdo completo do arquivo XML")
+                    else:
+                        st.warning("⚠️ Cole o conteúdo completo do XML (deve ter pelo menos 100 caracteres)")
     
     # ==================== LANÇAR VENDA ====================
     elif opcao == "💰 Lançar Venda":
