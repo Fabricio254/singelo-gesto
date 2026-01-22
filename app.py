@@ -3379,17 +3379,15 @@ def main():
                             qtd_embalagem = int(match.group(1))
                             nome_sem_qtd = match.group(2).strip()
                             
-                            # Mostrar alerta explicativo
-                            st.warning(f"""
-                            ⚠️ **Atenção!** Este material está cadastrado como **"{nome_material}"**
+                            # Mostrar alerta informativo (SEM divisão automática)
+                            st.info(f"""
+                            💡 **Material:** {nome_material}
                             
-                            Parece que vêm **{qtd_embalagem} unidades** na embalagem. 
+                            Este material tem **{qtd_embalagem} unidades** na embalagem.
                             
-                            💡 **Custo no banco:** R$ {float(material_selecionado['custo_unitario']):,.4f} (custo da embalagem com {qtd_embalagem} un)  
-                            💡 **Custo por unidade individual:** R$ {float(material_selecionado['custo_unitario'])/qtd_embalagem:,.4f}
+                            **Custo cadastrado:** R$ {float(material_selecionado['custo_unitario']):,.4f}
                             
-                            Se você quer usar **unidades individuais**, coloque a quantidade de unidades que precisa.
-                            O sistema calculará o custo correto automaticamente.
+                            ℹ️ O sistema usará o custo cadastrado. Se precisar ajustar, edite o material na aba "Materiais/Insumos".
                             """)
                         
                         # Inicializar quantidade
@@ -3437,9 +3435,6 @@ def main():
                                 if area > 0:
                                     st.success(f"📐 Área calculada: **{area:.6f} {unidade}²**")
                                     custo_material = float(material_selecionado['custo_unitario'])
-                                    # Ajustar custo se material tem quantidade na embalagem
-                                    if qtd_embalagem > 1:
-                                        custo_material = custo_material / qtd_embalagem
                                     custo_total = area * custo_material
                                     st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
                                 else:
@@ -3455,9 +3450,6 @@ def main():
                                 )
                                 if quantidade_usar > 0:
                                     custo_material = float(material_selecionado['custo_unitario'])
-                                    # Ajustar custo se material tem quantidade na embalagem
-                                    if qtd_embalagem > 1:
-                                        custo_material = custo_material / qtd_embalagem
                                     custo_total = quantidade_usar * custo_material
                                     st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
                         else:
@@ -3471,9 +3463,6 @@ def main():
                             )
                             if quantidade_usar > 0:
                                 custo_material = float(material_selecionado['custo_unitario'])
-                                # Ajustar custo se material tem quantidade na embalagem
-                                if qtd_embalagem > 1:
-                                    custo_material = custo_material / qtd_embalagem
                                 custo_total = quantidade_usar * custo_material
                                 st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
                         
@@ -3517,16 +3506,7 @@ def main():
                         quantidade = float(item['quantidade'])
                         custo_unit = float(material['custo_unitario'])
                         
-                        # Verificar se o material tem quantidade na embalagem (ex: "50 Ponteira...")
-                        import re
-                        nome_material = material['nome']
-                        qtd_embalagem = 1
-                        match = re.match(r'^(\d+)\s+(.+)', nome_material)
-                        if match:
-                            qtd_embalagem = int(match.group(1))
-                            # Ajustar custo unitário para unidade individual
-                            custo_unit = custo_unit / qtd_embalagem
-                        
+                        # Usar o custo cadastrado diretamente, sem divisão automática
                         custo_item = quantidade * custo_unit
                         custo_total_produto += custo_item
                         
@@ -3568,16 +3548,7 @@ def main():
                         quantidade = float(item['quantidade'])
                         custo_unit = float(material['custo_unitario'])
                         
-                        # Verificar se o material tem quantidade na embalagem (ex: "50 Ponteira...")
-                        import re
-                        nome_material = material['nome']
-                        qtd_embalagem = 1
-                        match = re.match(r'^(\d+)\s+(.+)', nome_material)
-                        if match:
-                            qtd_embalagem = int(match.group(1))
-                            # Ajustar custo unitário para unidade individual
-                            custo_unit = custo_unit / qtd_embalagem
-                        
+                        # Usar o custo cadastrado diretamente, sem divisão automática
                         custo_item = quantidade * custo_unit
                         
                         if produto not in custos_por_produto:
