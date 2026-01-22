@@ -173,6 +173,74 @@ def detectar_unidade_material(nome_produto):
     # Padrão se não detectar nada
     return 'unidade'
 
+# ==================== DETECÇÃO DE MATERIAIS SIMILARES ====================
+def calcular_similaridade(texto1, texto2):
+    """Calcula a similaridade entre dois textos (0 a 1)"""
+    texto1 = texto1.lower().strip()
+    texto2 = texto2.lower().strip()
+    
+    # Se for exatamente igual
+    if texto1 == texto2:
+        return 1.0
+    
+    # Remover palavras comuns que não agregam
+    palavras_remover = ['unidade', 'unidades', 'un', 'pcs', 'peças', 'pacote', 'caixa', 
+                        'kit', 'conjunto', 'com', 'de', 'para', 'em']
+    
+    def limpar_texto(texto):
+        palavras = texto.split()
+        palavras_filtradas = [p for p in palavras if p not in palavras_remover and not p.isdigit()]
+        return ' '.join(palavras_filtradas)
+    
+    texto1_limpo = limpar_texto(texto1)
+    texto2_limpo = limpar_texto(texto2)
+    
+    # Se um está contido no outro
+    if texto1_limpo in texto2_limpo or texto2_limpo in texto1_limpo:
+        return 0.8
+    
+    # Calcular palavras em comum
+    palavras1 = set(texto1_limpo.split())
+    palavras2 = set(texto2_limpo.split())
+    
+    if not palavras1 or not palavras2:
+        return 0.0
+    
+    intersecao = palavras1.intersection(palavras2)
+    uniao = palavras1.union(palavras2)
+    
+    similaridade = len(intersecao) / len(uniao)
+    return similaridade
+
+def buscar_materiais_similares(nome_novo, materiais_existentes, limiar=0.6):
+    """Busca materiais similares na lista de materiais existentes"""
+    similares = []
+    
+    for material in materiais_existentes:
+        similaridade = calcular_similaridade(nome_novo, material['nome'])
+        if similaridade >= limiar:
+            similares.append({
+                'material': material,
+                'similaridade': similaridade
+            })
+    
+    # Ordenar por similaridade (maior primeiro)
+    similares.sort(key=lambda x: x['similaridade'], reverse=True)
+    return similares
+
+def calcular_custo_medio_ponderado(estoque_atual, custo_atual, qtd_nova, custo_novo):
+    """Calcula o custo médio ponderado após nova compra"""
+    valor_estoque_atual = estoque_atual * custo_atual
+    valor_compra_nova = qtd_nova * custo_novo
+    
+    estoque_final = estoque_atual + qtd_nova
+    
+    if estoque_final == 0:
+        return custo_novo
+    
+    custo_medio = (valor_estoque_atual + valor_compra_nova) / estoque_final
+    return custo_medio
+
 # ==================== BOXES PREDEFINIDAS ====================
 BOXES = [
     "Box Café da manhã/tarde",
@@ -1448,25 +1516,110 @@ def main():
                                 # Botão para cadastrar como material
                                 if st.button(f"➕ Cadastrar como Material", key=f"btn_mat_manual_{idx}", use_container_width=True):
                                     try:
-                                        # Verificar se já existe
-                                        existe = supabase.table("singelo_materiais").select("id, custo_unitario").eq("nome", nome_material).execute()
+                                        # Buscar materiais existentes para verificar similaridade
+                                        todos_materiais = supabase.table("singelo_materiais").select("*").execute()
                                         
-                                        if existe.data:
-                                            # Atualizar custo
-                                            material_id = existe.data[0]['id']
-                                            custo_antigo = float(existe.data[0]['custo_unitario'])
+                                        # Buscar similares
+                                        similares = buscar_materiais_similares(nome_material, todos_materiais.data if todos_materiais.data else [])
+                                        
+                                        # Verificar se já existe exatamente com este nome
+                                        existe_exato = supabase.table("singelo_materiais").select("*").eq("nome", nome_material).execute()
+                                        
+                                        if existe_exato.data:
+                                            # Material com nome exato já existe - atualizar com custo médio ponderado
+                                            material_existente = existe_exato.data[0]
+                                            estoque_atual = float(material_existente['estoque_atual'])
+                                            custo_atual = float(material_existente['custo_unitario'])
+                                            
+                                            # Calcular custo médio ponderado
+                                            custo_medio = calcular_custo_medio_ponderado(
+                                                estoque_atual, custo_atual,
+                                                qtd_total_unidades, valor_unitario_real
+                                            )
+                                            
+                                            novo_estoque = estoque_atual + qtd_total_unidades
                                             
                                             supabase.table("singelo_materiais").update({
-                                                "custo_unitario": valor_unitario_real,
+                                                "custo_unitario": custo_medio,
+                                                "estoque_atual": novo_estoque,
                                                 "ultima_compra_data": datetime.now().date().isoformat(),
                                                 "fornecedor_principal": st.session_state.fornecedor_manual,
-                                                "estoque_atual": qtd_total_unidades,
                                                 "updated_at": datetime.now().isoformat()
-                                            }).eq("id", material_id).execute()
+                                            }).eq("id", material_existente['id']).execute()
                                             
-                                            st.success(f"✅ Material atualizado! Custo: R$ {custo_antigo:.4f} → R$ {valor_unitario_real:.4f}")
+                                            st.success(f"""
+                                            ✅ Material atualizado com **custo médio ponderado**!
+                                            - Custo anterior: R$ {custo_atual:.4f}
+                                            - Novo custo: R$ {valor_unitario_real:.4f}
+                                            - **Custo médio: R$ {custo_medio:.4f}**
+                                            - Estoque: {estoque_atual:.0f} + {qtd_total_unidades:.0f} = **{novo_estoque:.0f}**
+                                            """)
+                                            
+                                        elif similares:
+                                            # Encontrou materiais similares - perguntar se é o mesmo
+                                            st.warning(f"🔍 Encontrado {len(similares)} material(is) similar(es):")
+                                            
+                                            col_botoes = st.columns(len(similares[:3]) + 1)
+                                            
+                                            for i, sim in enumerate(similares[:3]):  # Mostrar no máximo 3
+                                                mat = sim['material']
+                                                similaridade_pct = sim['similaridade'] * 100
+                                                
+                                                with col_botoes[i]:
+                                                    st.markdown(f"**{mat['nome']}**")
+                                                    st.caption(f"{similaridade_pct:.0f}% similar")
+                                                    st.caption(f"R$ {float(mat['custo_unitario']):.4f}")
+                                                    st.caption(f"{float(mat['estoque_atual']):.2f} {mat['unidade_medida']}")
+                                                    
+                                                    if st.button(f"🔗 Vincular", key=f"vincular_{idx}_{mat['id']}", use_container_width=True):
+                                                        # Vincular a este material e atualizar com custo médio
+                                                        estoque_atual = float(mat['estoque_atual'])
+                                                        custo_atual = float(mat['custo_unitario'])
+                                                        
+                                                        custo_medio = calcular_custo_medio_ponderado(
+                                                            estoque_atual, custo_atual,
+                                                            qtd_total_unidades, valor_unitario_real
+                                                        )
+                                                        
+                                                        novo_estoque = estoque_atual + qtd_total_unidades
+                                                        
+                                                        supabase.table("singelo_materiais").update({
+                                                            "custo_unitario": custo_medio,
+                                                            "estoque_atual": novo_estoque,
+                                                            "ultima_compra_data": datetime.now().date().isoformat(),
+                                                            "updated_at": datetime.now().isoformat()
+                                                        }).eq("id", mat['id']).execute()
+                                                        
+                                                        st.success(f"""
+                                                        ✅ Vinculado a **{mat['nome']}**!
+                                                        - Custo médio: R$ {custo_medio:.4f}
+                                                        - Estoque: {novo_estoque:.0f}
+                                                        """)
+                                                        st.rerun()
+                                            
+                                            with col_botoes[-1]:
+                                                st.markdown("**Criar novo?**")
+                                                st.caption("Material diferente")
+                                                st.write("")
+                                                st.write("")
+                                                if st.button(f"➕ Novo", key=f"novo_{idx}", use_container_width=True):
+                                                    # Criar novo material
+                                                    material_data = {
+                                                        "nome": nome_material,
+                                                        "descricao": item.get('descricao', ''),
+                                                        "unidade_medida": unidade_med,
+                                                        "estoque_atual": qtd_total_unidades,
+                                                        "custo_unitario": valor_unitario_real,
+                                                        "ultima_compra_data": datetime.now().date().isoformat(),
+                                                        "fornecedor_principal": st.session_state.fornecedor_manual,
+                                                        "observacoes": "Cadastrado manualmente"
+                                                    }
+                                                    supabase.table("singelo_materiais").insert(material_data).execute()
+                                                    st.success(f"✅ Material '{nome_material}' criado!")
+                                                    st.rerun()
+                                            
                                         else:
-                                            # Cadastrar novo
+                                            # Não encontrou similares - cadastrar novo
                                             material_data = {
                                                 "nome": nome_material,
                                                 "descricao": item.get('descricao', ''),
