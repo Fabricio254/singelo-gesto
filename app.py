@@ -1649,41 +1649,31 @@ def main():
                                     value=nome_original,
                                     key=f"nome_mat_manual_{idx}"
                                 )
-                                
-                                qtd_embalagem_edit = st.number_input(
-                                    "Quantas unidades vêm na embalagem?",
-                                    min_value=1,
-                                    value=qtd_embalagem,
-                                    help="Ex: Se comprou '50 Unidades Balão', coloque 50",
-                                    key=f"qtd_emb_manual_{idx}"
-                                )
                             
                             with col2:
                                 qtd_comprada = float(item.get('quantidade', 1))
                                 valor_total_item = float(item.get('valor_total', 0))
-                                valor_unitario_item = float(item.get('valor_unitario', 0)) if item.get('valor_unitario') else valor_total_item / qtd_comprada
                                 
-                                st.metric("Qtd Comprada", f"{qtd_comprada:.0f}")
+                                st.metric("Qtd Comprada (NF-e)", f"{qtd_comprada:.0f}")
                                 st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
                                 
-                                # Se tem quantidade na embalagem, salvar custo do PACOTE completo
-                                # A divisão por unidades individuais será feita na Ficha Técnica
-                                if qtd_embalagem_edit > 1:
-                                    # Custo do pacote completo (ex: R$ 49,90 por pacote de 50)
-                                    valor_unitario_real = valor_unitario_item
-                                    custo_por_unidade_individual = valor_unitario_real / qtd_embalagem_edit
-                                    
-                                    st.metric("Custo do Pacote", f"R$ {valor_unitario_real:.4f}")
-                                    st.metric("Custo/Unidade Individual", f"R$ {custo_por_unidade_individual:.4f}", 
-                                             help="Este será calculado automaticamente na Ficha Técnica")
-                                    st.info(f"💡 Será salvo R$ {valor_unitario_real:.4f} (pacote com {qtd_embalagem_edit} un). Na Ficha Técnica, o sistema calculará R$ {custo_por_unidade_individual:.4f} por unidade.")
-                                else:
-                                    # Sem embalagem múltipla
-                                    qtd_total_unidades = qtd_comprada
-                                    valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
-                                    
-                                    st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
-                                    st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}")
+                                # Campo editável: Quantidade REAL de unidades
+                                qtd_sugerida = qtd_comprada * qtd_embalagem if qtd_embalagem > 1 else qtd_comprada
+                                
+                                qtd_real_unidades = st.number_input(
+                                    "📦 Quantidade REAL de unidades",
+                                    min_value=1.0,
+                                    value=float(qtd_sugerida),
+                                    step=1.0,
+                                    help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                    key=f"qtd_real_manual_{idx}"
+                                )
+                                
+                                # Calcular custo unitário com base na quantidade informada
+                                valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                
+                                st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
+                                st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                             
                             with col3:
                                 # Detectar unidade automaticamente
@@ -1720,10 +1710,10 @@ def main():
                                             # Calcular custo médio ponderado
                                             custo_medio = calcular_custo_medio_ponderado(
                                                 estoque_atual, custo_atual,
-                                                qtd_total_unidades, valor_unitario_real
+                                                qtd_real_unidades, valor_unitario_real
                                             )
                                             
-                                            novo_estoque = estoque_atual + qtd_total_unidades
+                                            novo_estoque = estoque_atual + qtd_real_unidades
                                             
                                             supabase.table("singelo_materiais").update({
                                                 "custo_unitario": custo_medio,
@@ -1795,11 +1785,11 @@ def main():
                                                         "nome": nome_material,
                                                         "descricao": descricao_original,
                                                         "unidade_medida": unidade_med,
-                                                        "estoque_atual": qtd_total_unidades,
+                                                        "estoque_atual": qtd_real_unidades,
                                                         "custo_unitario": valor_unitario_real,
                                                         "ultima_compra_data": datetime.now().date().isoformat(),
                                                         "fornecedor_principal": st.session_state.fornecedor_manual,
-                                                        "observacoes": f"Cadastrado - {qtd_embalagem_edit} unidades por embalagem"
+                                                        "observacoes": f"NF-e: {qtd_comprada:.0f} × R$ {valor_total_item/qtd_comprada:.2f} = {qtd_real_unidades:.0f} unidades"
                                                     }
                                                     supabase.table("singelo_materiais").insert(material_data).execute()
                                                     st.success(f"✅ Material '{nome_material}' criado!")
@@ -1812,11 +1802,11 @@ def main():
                                                 "nome": nome_material,
                                                 "descricao": descricao_original,
                                                 "unidade_medida": unidade_med,
-                                                "estoque_atual": qtd_total_unidades,
+                                                "estoque_atual": qtd_real_unidades,
                                                 "custo_unitario": valor_unitario_real,
                                                 "ultima_compra_data": datetime.now().date().isoformat(),
                                                 "fornecedor_principal": st.session_state.fornecedor_manual,
-                                                "observacoes": f"Cadastrado - {qtd_embalagem_edit} unidades por embalagem"
+                                                "observacoes": f"NF-e: {qtd_comprada:.0f} × R$ {valor_total_item/qtd_comprada:.2f} = {qtd_real_unidades:.0f} unidades"
                                             }
                                             supabase.table("singelo_materiais").insert(material_data).execute()
                                             st.success(f"✅ Material '{nome_material}' cadastrado com sucesso!")
@@ -1968,36 +1958,31 @@ def main():
                                                 value=nome_original,
                                                 key=f"nome_mat_{idx}"
                                             )
-                                            
-                                            qtd_embalagem_edit = st.number_input(
-                                                "Quantas unidades vêm na embalagem?",
-                                                min_value=1,
-                                                value=qtd_embalagem,
-                                                help="Ex: Se comprou '50 Unidades Balão', coloque 50",
-                                                key=f"qtd_emb_{idx}"
-                                            )
                                         
                                         with col2:
                                             qtd_comprada = float(item.get('quantidade', 1))
                                             valor_total_item = float(item.get('valor_total', 0))
-                                            valor_unitario_item = float(item.get('valor_unitario', 0)) if item.get('valor_unitario') else valor_total_item / qtd_comprada
                                             
-                                            st.metric("Qtd Comprada", f"{qtd_comprada:.0f}")
+                                            st.metric("Qtd Comprada (NF-e)", f"{qtd_comprada:.0f}")
                                             st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
                                             
-                                            # Se tem quantidade na embalagem, salvar custo do PACOTE completo
-                                            if qtd_embalagem_edit > 1:
-                                                valor_unitario_real = valor_unitario_item
-                                                custo_por_unidade_individual = valor_unitario_real / qtd_embalagem_edit
-                                                
-                                                st.metric("Custo do Pacote", f"R$ {valor_unitario_real:.4f}")
-                                                st.metric("Custo/Un Individual", f"R$ {custo_por_unidade_individual:.4f}")
-                                            else:
-                                                qtd_total_unidades = qtd_comprada
-                                                valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
-                                                
-                                                st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
-                                                st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}")
+                                            # Campo editável: Quantidade REAL de unidades
+                                            qtd_sugerida = qtd_comprada * qtd_embalagem if qtd_embalagem > 1 else qtd_comprada
+                                            
+                                            qtd_real_unidades = st.number_input(
+                                                "📦 Quantidade REAL de unidades",
+                                                min_value=1.0,
+                                                value=float(qtd_sugerida),
+                                                step=1.0,
+                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                                key=f"qtd_real_{idx}"
+                                            )
+                                            
+                                            # Calcular custo unitário com base na quantidade informada
+                                            valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                            
+                                            st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
+                                            st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                                         
                                         with col3:
                                             # Detectar unidade automaticamente
@@ -2175,36 +2160,31 @@ def main():
                                                 value=nome_original,
                                                 key=f"nome_mat_cupom_{idx}"
                                             )
-                                            
-                                            qtd_embalagem_edit = st.number_input(
-                                                "Quantas unidades vêm na embalagem?",
-                                                min_value=1,
-                                                value=qtd_embalagem,
-                                                help="Ex: Se comprou '50 Unidades Balão', coloque 50",
-                                                key=f"qtd_emb_cupom_{idx}"
-                                            )
                                         
                                         with col2:
                                             qtd_comprada = float(item.get('quantidade', 1))
                                             valor_total_item = float(item.get('valor_total', 0))
-                                            valor_unitario_item = float(item.get('valor_unitario', 0)) if item.get('valor_unitario') else valor_total_item / qtd_comprada
                                             
-                                            st.metric("Qtd Comprada", f"{qtd_comprada:.0f}")
+                                            st.metric("Qtd Comprada (Cupom)", f"{qtd_comprada:.0f}")
                                             st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
                                             
-                                            # Se tem quantidade na embalagem, salvar custo do PACOTE completo
-                                            if qtd_embalagem_edit > 1:
-                                                valor_unitario_real = valor_unitario_item
-                                                custo_por_unidade_individual = valor_unitario_real / qtd_embalagem_edit
-                                                
-                                                st.metric("Custo do Pacote", f"R$ {valor_unitario_real:.4f}")
-                                                st.metric("Custo/Un Individual", f"R$ {custo_por_unidade_individual:.4f}")
-                                            else:
-                                                qtd_total_unidades = qtd_comprada
-                                                valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
-                                                
-                                                st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
-                                                st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}")
+                                            # Campo editável: Quantidade REAL de unidades
+                                            qtd_sugerida = qtd_comprada * qtd_embalagem if qtd_embalagem > 1 else qtd_comprada
+                                            
+                                            qtd_real_unidades = st.number_input(
+                                                "📦 Quantidade REAL de unidades",
+                                                min_value=1.0,
+                                                value=float(qtd_sugerida),
+                                                step=1.0,
+                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                                key=f"qtd_real_cupom_{idx}"
+                                            )
+                                            
+                                            # Calcular custo unitário com base na quantidade informada
+                                            valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                            
+                                            st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
+                                            st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                                         
                                         with col3:
                                             # Detectar unidade automaticamente
