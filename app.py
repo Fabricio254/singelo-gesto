@@ -3254,10 +3254,10 @@ def main():
                 
                 # Buscar produtos únicos da tabela de vendas
                 try:
-                    vendas_response = supabase.table("singelo_vendas").select("nome_box").execute()
+                    vendas_response = supabase.table("singelo_vendas").select("produto").execute()
                     if vendas_response.data:
                         # Extrair produtos únicos e ordenar
-                        PRODUTOS = sorted(list(set([v['nome_box'] for v in vendas_response.data if v.get('nome_box')])))
+                        PRODUTOS = sorted(list(set([v['produto'] for v in vendas_response.data if v.get('produto')])))
                     else:
                         # Produtos padrão se não houver vendas cadastradas
                         PRODUTOS = [
