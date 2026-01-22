@@ -1032,7 +1032,7 @@ def main():
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
             "Selecione uma opção:",
-            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "📦 Custos Produtos", "📋 Histórico"],
+            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "📦 Custos Produtos", "🧾 Ficha Técnica", "📋 Histórico"],
             label_visibility="collapsed"
         )
         
@@ -2208,6 +2208,297 @@ def main():
             Após criar a tabela, volte aqui para ver os custos dos produtos!
             """)
             st.error(f"⚠️ Erro ao acessar tabela: {str(e)}")
+    
+    # ==================== FICHA TÉCNICA ====================
+    elif opcao == "🧾 Ficha Técnica":
+        st.markdown("## 🧾 Ficha Técnica de Produtos")
+        
+        # Verificar se as tabelas existem
+        try:
+            teste_materiais = supabase.table("singelo_materiais").select("id").limit(1).execute()
+            teste_fichas = supabase.table("singelo_fichas_tecnicas").select("id").limit(1).execute()
+            
+            # Tabs principais
+            tab1, tab2, tab3 = st.tabs(["📦 Materiais/Insumos", "🧾 Fichas Técnicas", "💰 Custo por Produto"])
+            
+            # ===== TAB 1: MATERIAIS =====
+            with tab1:
+                st.markdown("### 📦 Cadastro de Materiais")
+                
+                # Formulário de cadastro
+                with st.expander("➕ Adicionar Novo Material", expanded=False):
+                    with st.form("form_material"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            nome_material = st.text_input("Nome do Material*", placeholder="Ex: Balão Bubble 24 polegadas")
+                            unidade = st.selectbox("Unidade de Medida*", 
+                                ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo", "caixa"])
+                            custo_unitario = st.number_input("Custo Unitário (R$)*", min_value=0.0, step=0.01, format="%.2f")
+                        
+                        with col2:
+                            descricao_material = st.text_area("Descrição", placeholder="Ex: Balão transparente 24 polegadas")
+                            estoque_inicial = st.number_input("Estoque Inicial", min_value=0.0, step=1.0, value=0.0)
+                            fornecedor = st.text_input("Fornecedor Principal", placeholder="Nome do fornecedor")
+                        
+                        observacoes_mat = st.text_area("Observações", placeholder="Informações adicionais...")
+                        
+                        submitted = st.form_submit_button("💾 Salvar Material", use_container_width=True)
+                        
+                        if submitted:
+                            if nome_material and custo_unitario > 0:
+                                try:
+                                    material_data = {
+                                        "nome": nome_material,
+                                        "descricao": descricao_material,
+                                        "unidade_medida": unidade,
+                                        "estoque_atual": float(estoque_inicial),
+                                        "custo_unitario": float(custo_unitario),
+                                        "fornecedor_principal": fornecedor,
+                                        "observacoes": observacoes_mat,
+                                        "ultima_compra_data": datetime.now().date().isoformat()
+                                    }
+                                    supabase.table("singelo_materiais").insert(material_data).execute()
+                                    st.success(f"✅ Material '{nome_material}' cadastrado com sucesso!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro ao salvar: {str(e)}")
+                            else:
+                                st.warning("Preencha os campos obrigatórios (*)!")
+                
+                # Listar materiais cadastrados
+                st.markdown("---")
+                st.markdown("### 📋 Materiais Cadastrados")
+                
+                materiais = supabase.table("singelo_materiais").select("*").order("nome").execute()
+                
+                if materiais.data:
+                    import pandas as pd
+                    df_materiais = []
+                    for mat in materiais.data:
+                        df_materiais.append({
+                            "ID": mat['id'],
+                            "Material": mat['nome'],
+                            "Unidade": mat['unidade_medida'],
+                            "Custo/Un": f"R$ {float(mat['custo_unitario']):.2f}",
+                            "Estoque": f"{float(mat['estoque_atual']):.2f}",
+                            "Valor Estoque": f"R$ {float(mat['estoque_atual']) * float(mat['custo_unitario']):.2f}",
+                            "Fornecedor": mat.get('fornecedor_principal', '-')
+                        })
+                    
+                    df = pd.DataFrame(df_materiais)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    
+                    # Totalizador
+                    valor_total_estoque = sum([float(m['estoque_atual']) * float(m['custo_unitario']) for m in materiais.data])
+                    st.info(f"💰 **Valor Total em Estoque:** R$ {valor_total_estoque:,.2f}")
+                else:
+                    st.info("Nenhum material cadastrado ainda.")
+            
+            # ===== TAB 2: FICHAS TÉCNICAS =====
+            with tab2:
+                st.markdown("### 🧾 Composição dos Produtos")
+                
+                # Buscar produtos disponíveis
+                PRODUTOS = [
+                    "Box Pequena",
+                    "Box Média",
+                    "Box Grande",
+                    "Box Premium",
+                    "Box Especial Dia das Mães",
+                    "Box Especial Dia dos Namorados",
+                    "Box Especial Natal",
+                    "Box de Flor com Caneca"
+                ]
+                
+                # Seletor de produto
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    produto_selecionado = st.selectbox("Selecione o Produto", PRODUTOS)
+                with col2:
+                    if st.button("🔄 Atualizar", use_container_width=True):
+                        st.rerun()
+                
+                st.markdown(f"### Ficha Técnica: **{produto_selecionado}**")
+                
+                # Formulário para adicionar material à ficha
+                with st.expander("➕ Adicionar Material à Ficha", expanded=False):
+                    # Buscar materiais disponíveis
+                    materiais_disp = supabase.table("singelo_materiais").select("*").order("nome").execute()
+                    
+                    if materiais_disp.data:
+                        with st.form("form_ficha"):
+                            # Criar dicionário de materiais
+                            materiais_dict = {f"{m['nome']} ({m['unidade_medida']})": m['id'] for m in materiais_disp.data}
+                            
+                            material_nome = st.selectbox("Material", list(materiais_dict.keys()))
+                            quantidade_usar = st.number_input("Quantidade Necessária", min_value=0.0, step=0.01, format="%.4f")
+                            obs_ficha = st.text_input("Observações", placeholder="Ex: usar 25cm do rolo")
+                            
+                            submitted_ficha = st.form_submit_button("➕ Adicionar à Ficha", use_container_width=True)
+                            
+                            if submitted_ficha and quantidade_usar > 0:
+                                try:
+                                    material_id = materiais_dict[material_nome]
+                                    ficha_data = {
+                                        "produto": produto_selecionado,
+                                        "material_id": material_id,
+                                        "quantidade": float(quantidade_usar),
+                                        "observacoes": obs_ficha
+                                    }
+                                    supabase.table("singelo_fichas_tecnicas").insert(ficha_data).execute()
+                                    st.success(f"✅ Material adicionado à ficha!")
+                                    st.rerun()
+                                except Exception as e:
+                                    if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+                                        st.error("Este material já está na ficha deste produto!")
+                                    else:
+                                        st.error(f"Erro: {str(e)}")
+                    else:
+                        st.warning("Cadastre materiais primeiro na aba 'Materiais/Insumos'!")
+                
+                # Mostrar ficha técnica do produto
+                st.markdown("---")
+                st.markdown("### 📋 Materiais Necessários")
+                
+                # Buscar ficha técnica com join de materiais
+                fichas = supabase.table("singelo_fichas_tecnicas").select("*, singelo_materiais(*)").eq("produto", produto_selecionado).execute()
+                
+                if fichas.data:
+                    custo_total_produto = 0
+                    
+                    for item in fichas.data:
+                        material = item['singelo_materiais']
+                        quantidade = float(item['quantidade'])
+                        custo_unit = float(material['custo_unitario'])
+                        custo_item = quantidade * custo_unit
+                        custo_total_produto += custo_item
+                        
+                        col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
+                        
+                        with col1:
+                            st.write(f"**{material['nome']}**")
+                            if item.get('observacoes'):
+                                st.caption(item['observacoes'])
+                        with col2:
+                            st.write(f"{quantidade:.4f}")
+                        with col3:
+                            st.write(material['unidade_medida'])
+                        with col4:
+                            st.write(f"R$ {custo_item:.2f}")
+                        with col5:
+                            if st.button("🗑️", key=f"del_{item['id']}"):
+                                supabase.table("singelo_fichas_tecnicas").delete().eq("id", item['id']).execute()
+                                st.rerun()
+                    
+                    st.markdown("---")
+                    st.success(f"### 💰 Custo Total de Produção: R$ {custo_total_produto:.2f}")
+                else:
+                    st.info("Nenhum material adicionado nesta ficha ainda.")
+            
+            # ===== TAB 3: CUSTO POR PRODUTO =====
+            with tab3:
+                st.markdown("### 💰 Resumo de Custos por Produto")
+                
+                # Buscar todas as fichas e calcular custos
+                todas_fichas = supabase.table("singelo_fichas_tecnicas").select("*, singelo_materiais(*)").execute()
+                
+                if todas_fichas.data:
+                    custos_por_produto = {}
+                    
+                    for item in todas_fichas.data:
+                        produto = item['produto']
+                        material = item['singelo_materiais']
+                        quantidade = float(item['quantidade'])
+                        custo_unit = float(material['custo_unitario'])
+                        custo_item = quantidade * custo_unit
+                        
+                        if produto not in custos_por_produto:
+                            custos_por_produto[produto] = {
+                                'custo_total': 0,
+                                'materiais': []
+                            }
+                        
+                        custos_por_produto[produto]['custo_total'] += custo_item
+                        custos_por_produto[produto]['materiais'].append({
+                            'nome': material['nome'],
+                            'quantidade': quantidade,
+                            'unidade': material['unidade_medida'],
+                            'custo': custo_item
+                        })
+                    
+                    # Mostrar resumo
+                    for produto, dados in custos_por_produto.items():
+                        with st.expander(f"**{produto}** - Custo: R$ {dados['custo_total']:.2f}"):
+                            for mat in dados['materiais']:
+                                st.write(f"- {mat['nome']}: {mat['quantidade']:.4f} {mat['unidade']} = R$ {mat['custo']:.2f}")
+                            st.markdown(f"**Total:** R$ {dados['custo_total']:.2f}")
+                    
+                    # Gráfico de custos (opcional)
+                    st.markdown("---")
+                    import pandas as pd
+                    df_custos = pd.DataFrame([
+                        {"Produto": produto, "Custo de Produção": dados['custo_total']}
+                        for produto, dados in custos_por_produto.items()
+                    ]).sort_values("Custo de Produção", ascending=False)
+                    
+                    st.bar_chart(df_custos.set_index("Produto"))
+                else:
+                    st.info("Nenhuma ficha técnica cadastrada ainda.")
+        
+        except Exception as e:
+            st.info("""
+            💡 **Configure o sistema de Ficha Técnica:**
+            
+            Para usar o controle de custos de produção, execute este SQL no Supabase:
+            
+            📄 Arquivo: `criar_tabelas_ficha_tecnica.sql`
+            
+            Este arquivo já está criado na pasta do projeto!
+            """)
+            
+            with st.expander("📋 Ver SQL Completo"):
+                st.code("""
+-- SISTEMA DE FICHA TÉCNICA DE PRODUTOS
+-- Execute este SQL no Supabase SQL Editor
+
+-- Tabela de Materiais/Insumos
+CREATE TABLE singelo_materiais (
+    id BIGSERIAL PRIMARY KEY,
+    nome TEXT NOT NULL,
+    descricao TEXT,
+    unidade_medida TEXT NOT NULL,
+    estoque_atual NUMERIC DEFAULT 0,
+    custo_unitario NUMERIC NOT NULL,
+    ultima_compra_data DATE,
+    fornecedor_principal TEXT,
+    observacoes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tabela de Fichas Técnicas
+CREATE TABLE singelo_fichas_tecnicas (
+    id BIGSERIAL PRIMARY KEY,
+    produto TEXT NOT NULL,
+    material_id BIGINT REFERENCES singelo_materiais(id) ON DELETE CASCADE,
+    quantidade NUMERIC NOT NULL,
+    observacoes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(produto, material_id)
+);
+
+-- Habilitar Row Level Security
+ALTER TABLE singelo_materiais ENABLE ROW LEVEL SECURITY;
+ALTER TABLE singelo_fichas_tecnicas ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Permitir todas operações em materiais" ON singelo_materiais
+FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Permitir todas operações em fichas_tecnicas" ON singelo_fichas_tecnicas
+FOR ALL USING (true) WITH CHECK (true);
+                """, language="sql")
+            
+            st.warning(f"Detalhes do erro: {str(e)}")
     
     # ==================== HISTÓRICO ====================
     elif opcao == "📋 Histórico":
