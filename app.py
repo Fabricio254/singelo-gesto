@@ -1661,17 +1661,29 @@ def main():
                             with col2:
                                 qtd_comprada = float(item.get('quantidade', 1))
                                 valor_total_item = float(item.get('valor_total', 0))
+                                valor_unitario_item = float(item.get('valor_unitario', 0)) if item.get('valor_unitario') else valor_total_item / qtd_comprada
                                 
                                 st.metric("Qtd Comprada", f"{qtd_comprada:.0f}")
                                 st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
                                 
-                                # Calcular valor unitário real
-                                qtd_total_unidades = qtd_comprada * qtd_embalagem_edit
-                                valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
-                                
-                                st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
-                                st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}", 
-                                         help="Este é o custo que será usado na Ficha Técnica")
+                                # Se tem quantidade na embalagem, salvar custo do PACOTE completo
+                                # A divisão por unidades individuais será feita na Ficha Técnica
+                                if qtd_embalagem_edit > 1:
+                                    # Custo do pacote completo (ex: R$ 49,90 por pacote de 50)
+                                    valor_unitario_real = valor_unitario_item
+                                    custo_por_unidade_individual = valor_unitario_real / qtd_embalagem_edit
+                                    
+                                    st.metric("Custo do Pacote", f"R$ {valor_unitario_real:.4f}")
+                                    st.metric("Custo/Unidade Individual", f"R$ {custo_por_unidade_individual:.4f}", 
+                                             help="Este será calculado automaticamente na Ficha Técnica")
+                                    st.info(f"💡 Será salvo R$ {valor_unitario_real:.4f} (pacote com {qtd_embalagem_edit} un). Na Ficha Técnica, o sistema calculará R$ {custo_por_unidade_individual:.4f} por unidade.")
+                                else:
+                                    # Sem embalagem múltipla
+                                    qtd_total_unidades = qtd_comprada
+                                    valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
+                                    
+                                    st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
+                                    st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}")
                             
                             with col3:
                                 # Detectar unidade automaticamente
@@ -1968,17 +1980,24 @@ def main():
                                         with col2:
                                             qtd_comprada = float(item.get('quantidade', 1))
                                             valor_total_item = float(item.get('valor_total', 0))
+                                            valor_unitario_item = float(item.get('valor_unitario', 0)) if item.get('valor_unitario') else valor_total_item / qtd_comprada
                                             
                                             st.metric("Qtd Comprada", f"{qtd_comprada:.0f}")
                                             st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
                                             
-                                            # Calcular valor unitário real
-                                            qtd_total_unidades = qtd_comprada * qtd_embalagem_edit
-                                            valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
-                                            
-                                            st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
-                                            st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}", 
-                                                     help="Este é o custo que será usado na Ficha Técnica")
+                                            # Se tem quantidade na embalagem, salvar custo do PACOTE completo
+                                            if qtd_embalagem_edit > 1:
+                                                valor_unitario_real = valor_unitario_item
+                                                custo_por_unidade_individual = valor_unitario_real / qtd_embalagem_edit
+                                                
+                                                st.metric("Custo do Pacote", f"R$ {valor_unitario_real:.4f}")
+                                                st.metric("Custo/Un Individual", f"R$ {custo_por_unidade_individual:.4f}")
+                                            else:
+                                                qtd_total_unidades = qtd_comprada
+                                                valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
+                                                
+                                                st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
+                                                st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}")
                                         
                                         with col3:
                                             # Detectar unidade automaticamente
@@ -2168,17 +2187,24 @@ def main():
                                         with col2:
                                             qtd_comprada = float(item.get('quantidade', 1))
                                             valor_total_item = float(item.get('valor_total', 0))
+                                            valor_unitario_item = float(item.get('valor_unitario', 0)) if item.get('valor_unitario') else valor_total_item / qtd_comprada
                                             
                                             st.metric("Qtd Comprada", f"{qtd_comprada:.0f}")
                                             st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
                                             
-                                            # Calcular valor unitário real
-                                            qtd_total_unidades = qtd_comprada * qtd_embalagem_edit
-                                            valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
-                                            
-                                            st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
-                                            st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}", 
-                                                     help="Este é o custo que será usado na Ficha Técnica")
+                                            # Se tem quantidade na embalagem, salvar custo do PACOTE completo
+                                            if qtd_embalagem_edit > 1:
+                                                valor_unitario_real = valor_unitario_item
+                                                custo_por_unidade_individual = valor_unitario_real / qtd_embalagem_edit
+                                                
+                                                st.metric("Custo do Pacote", f"R$ {valor_unitario_real:.4f}")
+                                                st.metric("Custo/Un Individual", f"R$ {custo_por_unidade_individual:.4f}")
+                                            else:
+                                                qtd_total_unidades = qtd_comprada
+                                                valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
+                                                
+                                                st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
+                                                st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}")
                                         
                                         with col3:
                                             # Detectar unidade automaticamente
