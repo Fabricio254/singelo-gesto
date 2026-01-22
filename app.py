@@ -1635,20 +1635,18 @@ def main():
                                 # Detectar quantidade no nome (ex: "50 Unidades...")
                                 nome_original = item.get('nome', '')
                                 qtd_embalagem = 1
-                                nome_limpo = nome_original
                                 
-                                # Tentar extrair quantidade do nome
+                                # Tentar extrair quantidade do nome APENAS para calcular custo
                                 import re
                                 match = re.match(r'(\d+)\s+(unidades?|un|pcs?|peças?)\s+(.+)', nome_original, re.IGNORECASE)
                                 if match:
                                     qtd_embalagem = int(match.group(1))
-                                    nome_limpo = match.group(3).strip()
                                     st.success(f"✨ Detectado: **{qtd_embalagem} unidades** na embalagem")
                                 
-                                # Permitir edição
+                                # Permitir edição - USAR NOME ORIGINAL COMPLETO
                                 nome_material = st.text_input(
                                     "Nome do Material", 
-                                    value=nome_limpo,
+                                    value=nome_original,
                                     key=f"nome_mat_manual_{idx}"
                                 )
                                 
@@ -1944,20 +1942,18 @@ def main():
                                             # Detectar quantidade no nome (ex: "50 Unidades...")
                                             nome_original = item.get('nome', '')
                                             qtd_embalagem = 1
-                                            nome_limpo = nome_original
                                             
-                                            # Tentar extrair quantidade do nome
+                                            # Tentar extrair quantidade do nome APENAS para calcular custo
                                             import re
                                             match = re.match(r'(\d+)\s+(unidades?|un|pcs?|peças?)\s+(.+)', nome_original, re.IGNORECASE)
                                             if match:
                                                 qtd_embalagem = int(match.group(1))
-                                                nome_limpo = match.group(3).strip()
                                                 st.success(f"✨ Detectado: **{qtd_embalagem} unidades** na embalagem")
                                             
-                                            # Permitir edição
+                                            # Permitir edição - USAR NOME ORIGINAL COMPLETO
                                             nome_material = st.text_input(
                                                 "Nome do Material", 
-                                                value=nome_limpo,
+                                                value=nome_original,
                                                 key=f"nome_mat_{idx}"
                                             )
                                             
@@ -2146,20 +2142,18 @@ def main():
                                             # Detectar quantidade no nome (ex: "50 Unidades...")
                                             nome_original = item.get('nome', '')
                                             qtd_embalagem = 1
-                                            nome_limpo = nome_original
                                             
-                                            # Tentar extrair quantidade do nome
+                                            # Tentar extrair quantidade do nome APENAS para calcular custo
                                             import re
                                             match = re.match(r'(\d+)\s+(unidades?|un|pcs?|peças?)\s+(.+)', nome_original, re.IGNORECASE)
                                             if match:
                                                 qtd_embalagem = int(match.group(1))
-                                                nome_limpo = match.group(3).strip()
                                                 st.success(f"✨ Detectado: **{qtd_embalagem} unidades** na embalagem")
                                             
-                                            # Permitir edição
+                                            # Permitir edição - USAR NOME ORIGINAL COMPLETO
                                             nome_material = st.text_input(
                                                 "Nome do Material", 
-                                                value=nome_limpo,
+                                                value=nome_original,
                                                 key=f"nome_mat_cupom_{idx}"
                                             )
                                             
@@ -3077,6 +3071,7 @@ def main():
                                         match = re.match(r'(\d+)\s+(unidades?|un|pcs?|peças?)\s+(.+)', nome_original, re.IGNORECASE)
                                         if match:
                                             qtd_embalagem = int(match.group(1))
+                                            # Para items antigos mantemos o nome limpo para evitar duplicação
                                             nome_limpo = match.group(3).strip()
                                         
                                         st.write(f"**{nome_limpo}**")
