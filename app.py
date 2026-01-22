@@ -2951,90 +2951,93 @@ def main():
                     materiais_disp = supabase.table("singelo_materiais").select("*").order("nome").execute()
                     
                     if materiais_disp.data:
-                        with st.form("form_ficha"):
-                            # Criar dicionário de materiais com informações completas
-                            materiais_dict = {f"{m['nome']} ({m['unidade_medida']})": m for m in materiais_disp.data}
+                        # Criar dicionário de materiais com informações completas
+                        materiais_dict = {f"{m['nome']} ({m['unidade_medida']})": m for m in materiais_disp.data}
+                        
+                        material_nome = st.selectbox("Material", list(materiais_dict.keys()), key="sel_material_ficha")
+                        material_selecionado = materiais_dict[material_nome]
+                        unidade = material_selecionado['unidade_medida']
+                        
+                        # Inicializar quantidade
+                        quantidade_usar = 0.0
+                        
+                        # Verificar se é material que usa área (metro, centímetro, rolo)
+                        usa_area = unidade in ['metro', 'centímetro', 'rolo']
+                        
+                        if usa_area:
+                            st.info(f"💡 Para materiais em **{unidade}**, você pode informar dimensões (comprimento × largura) para cálculo automático de área")
                             
-                            material_nome = st.selectbox("Material", list(materiais_dict.keys()))
-                            material_selecionado = materiais_dict[material_nome]
-                            unidade = material_selecionado['unidade_medida']
+                            tipo_calculo = st.radio(
+                                "Tipo de cálculo",
+                                ["Quantidade simples", "Área (comprimento × largura)"],
+                                help="Escolha como quer calcular a quantidade",
+                                key="tipo_calc_ficha"
+                            )
                             
-                            # Inicializar quantidade
-                            quantidade_usar = 0.0
-                            
-                            # Verificar se é material que usa área (metro, centímetro, rolo)
-                            usa_area = unidade in ['metro', 'centímetro', 'rolo']
-                            
-                            if usa_area:
-                                st.info(f"💡 Para materiais em **{unidade}**, você pode informar dimensões (comprimento × largura) para cálculo automático de área")
-                                
-                                tipo_calculo = st.radio(
-                                    "Tipo de cálculo",
-                                    ["Quantidade simples", "Área (comprimento × largura)"],
-                                    help="Escolha como quer calcular a quantidade"
-                                )
-                                
-                                if tipo_calculo == "Área (comprimento × largura)":
-                                    st.markdown("#### 📐 Informe as dimensões:")
-                                    col_a, col_b = st.columns(2)
-                                    with col_a:
-                                        comprimento = st.number_input(
-                                            f"Comprimento ({unidade})", 
-                                            min_value=0.0, 
-                                            step=0.01, 
-                                            format="%.4f",
-                                            help=f"Ex: 0,15 para 15cm (se unidade é metro)"
-                                        )
-                                    with col_b:
-                                        largura = st.number_input(
-                                            f"Largura ({unidade})", 
-                                            min_value=0.0, 
-                                            step=0.01, 
-                                            format="%.4f",
-                                            help=f"Ex: 0,04 para 4cm (se unidade é metro)"
-                                        )
-                                    
-                                    # Calcular área automaticamente
-                                    area = comprimento * largura
-                                    quantidade_usar = area
-                                    
-                                    if area > 0:
-                                        st.success(f"📐 Área calculada: **{area:.6f} {unidade}²**")
-                                        custo_material = float(material_selecionado['custo_unitario'])
-                                        custo_total = area * custo_material
-                                        st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
-                                    else:
-                                        st.warning("Informe o comprimento e largura para calcular a área")
-                                else:
-                                    quantidade_usar = st.number_input(
-                                        f"Quantidade Necessária ({unidade})", 
+                            if tipo_calculo == "Área (comprimento × largura)":
+                                st.markdown("#### 📐 Informe as dimensões:")
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    comprimento = st.number_input(
+                                        f"Comprimento ({unidade})", 
                                         min_value=0.0, 
                                         step=0.01, 
                                         format="%.4f",
-                                        help="Digite a quantidade que será usada"
+                                        help=f"Ex: 0,15 para 15cm (se unidade é metro)",
+                                        key="comp_ficha"
                                     )
-                                    if quantidade_usar > 0:
-                                        custo_material = float(material_selecionado['custo_unitario'])
-                                        custo_total = quantidade_usar * custo_material
-                                        st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
+                                with col_b:
+                                    largura = st.number_input(
+                                        f"Largura ({unidade})", 
+                                        min_value=0.0, 
+                                        step=0.01, 
+                                        format="%.4f",
+                                        help=f"Ex: 0,04 para 4cm (se unidade é metro)",
+                                        key="larg_ficha"
+                                    )
+                                
+                                # Calcular área automaticamente
+                                area = comprimento * largura
+                                quantidade_usar = area
+                                
+                                if area > 0:
+                                    st.success(f"📐 Área calculada: **{area:.6f} {unidade}²**")
+                                    custo_material = float(material_selecionado['custo_unitario'])
+                                    custo_total = area * custo_material
+                                    st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
+                                else:
+                                    st.warning("Informe o comprimento e largura para calcular a área")
                             else:
                                 quantidade_usar = st.number_input(
                                     f"Quantidade Necessária ({unidade})", 
                                     min_value=0.0, 
                                     step=0.01, 
                                     format="%.4f",
-                                    help="Digite a quantidade que será usada"
+                                    help="Digite a quantidade que será usada",
+                                    key="qtd_simples_ficha"
                                 )
                                 if quantidade_usar > 0:
                                     custo_material = float(material_selecionado['custo_unitario'])
                                     custo_total = quantidade_usar * custo_material
                                     st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
-                            
-                            obs_ficha = st.text_input("Observações", placeholder="Ex: usar 15cm de comprimento × 4cm de altura")
-                            
-                            submitted_ficha = st.form_submit_button("➕ Adicionar à Ficha", use_container_width=True)
-                            
-                            if submitted_ficha and quantidade_usar > 0:
+                        else:
+                            quantidade_usar = st.number_input(
+                                f"Quantidade Necessária ({unidade})", 
+                                min_value=0.0, 
+                                step=0.01, 
+                                format="%.4f",
+                                help="Digite a quantidade que será usada",
+                                key="qtd_ficha"
+                            )
+                            if quantidade_usar > 0:
+                                custo_material = float(material_selecionado['custo_unitario'])
+                                custo_total = quantidade_usar * custo_material
+                                st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
+                        
+                        obs_ficha = st.text_input("Observações", placeholder="Ex: usar 15cm de comprimento × 4cm de altura", key="obs_ficha")
+                        
+                        if st.button("➕ Adicionar à Ficha", use_container_width=True, type="primary", key="btn_add_ficha"):
+                            if quantidade_usar > 0:
                                 try:
                                     material_id = material_selecionado['id']
                                     ficha_data = {
@@ -3051,6 +3054,8 @@ def main():
                                         st.error("Este material já está na ficha deste produto!")
                                     else:
                                         st.error(f"Erro: {str(e)}")
+                            else:
+                                st.warning("⚠️ Informe a quantidade antes de adicionar!")
                     else:
                         st.warning("Cadastre materiais primeiro na aba 'Materiais/Insumos'!")
                 
