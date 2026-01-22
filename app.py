@@ -2959,22 +2959,23 @@ def main():
                             material_selecionado = materiais_dict[material_nome]
                             unidade = material_selecionado['unidade_medida']
                             
+                            # Inicializar quantidade
+                            quantidade_usar = 0.0
+                            
                             # Verificar se é material que usa área (metro, centímetro, rolo)
                             usa_area = unidade in ['metro', 'centímetro', 'rolo']
                             
                             if usa_area:
                                 st.info(f"💡 Para materiais em **{unidade}**, você pode informar dimensões (comprimento × largura) para cálculo automático de área")
                                 
-                                col1, col2, col3 = st.columns([1, 1, 1])
-                                
-                                with col1:
-                                    tipo_calculo = st.radio(
-                                        "Tipo de cálculo",
-                                        ["Quantidade simples", "Área (comprimento × largura)"],
-                                        help="Escolha como quer calcular a quantidade"
-                                    )
+                                tipo_calculo = st.radio(
+                                    "Tipo de cálculo",
+                                    ["Quantidade simples", "Área (comprimento × largura)"],
+                                    help="Escolha como quer calcular a quantidade"
+                                )
                                 
                                 if tipo_calculo == "Área (comprimento × largura)":
+                                    st.markdown("#### 📐 Informe as dimensões:")
                                     col_a, col_b = st.columns(2)
                                     with col_a:
                                         comprimento = st.number_input(
@@ -3002,12 +3003,15 @@ def main():
                                         custo_material = float(material_selecionado['custo_unitario'])
                                         custo_total = area * custo_material
                                         st.metric("💰 Custo estimado", f"R$ {custo_total:.4f}")
+                                    else:
+                                        st.warning("Informe o comprimento e largura para calcular a área")
                                 else:
                                     quantidade_usar = st.number_input(
                                         f"Quantidade Necessária ({unidade})", 
                                         min_value=0.0, 
                                         step=0.01, 
-                                        format="%.4f"
+                                        format="%.4f",
+                                        help="Digite a quantidade que será usada"
                                     )
                                     if quantidade_usar > 0:
                                         custo_material = float(material_selecionado['custo_unitario'])
@@ -3018,7 +3022,8 @@ def main():
                                     f"Quantidade Necessária ({unidade})", 
                                     min_value=0.0, 
                                     step=0.01, 
-                                    format="%.4f"
+                                    format="%.4f",
+                                    help="Digite a quantidade que será usada"
                                 )
                                 if quantidade_usar > 0:
                                     custo_material = float(material_selecionado['custo_unitario'])
