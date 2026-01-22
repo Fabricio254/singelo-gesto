@@ -115,6 +115,64 @@ def apply_custom_style():
         </style>
     """, unsafe_allow_html=True)
 
+# ==================== DETECÇÃO AUTOMÁTICA DE UNIDADE ====================
+def detectar_unidade_material(nome_produto):
+    """Detecta automaticamente a unidade de medida baseado no nome do produto"""
+    nome_lower = nome_produto.lower()
+    
+    # Materiais em METRO
+    palavras_metro = ['vinil', 'adesivo', 'tecido', 'papel', 'lona', 'banner', 'fita', 
+                      'rolo', 'cetim', 'tnt', 'feltro', 'cordao', 'corda', 'barbante',
+                      'ribbon', 'organza', 'tule']
+    
+    # Materiais em UNIDADE
+    palavras_unidade = ['balao', 'balão', 'bubble', 'flor', 'caneca', 'xicara', 'xícara',
+                        'copo', 'prato', 'chocolate', 'bombom', 'vela', 'rosa', 'girassol',
+                        'orquidea', 'orquídea', 'tulipa', 'mini', 'chaveiro', 'imã', 'ima',
+                        'tag', 'cartao', 'cartão', 'envelope']
+    
+    # Materiais em LITRO
+    palavras_litro = ['tinta', 'cola', 'verniz', 'solvente', 'alcool', 'álcool', 
+                      'thinner', 'agua', 'água', 'oleo', 'óleo', 'liquido', 'líquido']
+    
+    # Materiais em KG
+    palavras_kg = ['acucar', 'açúcar', 'farinha', 'sal', 'pes', 'pés', 'granulado',
+                   'granel', 'argila', 'massa', 'gesso']
+    
+    # Materiais em GRAMA
+    palavras_grama = ['glitter', 'brilho', 'purpurina', 'confete', 'confeti']
+    
+    # Materiais em PACOTE
+    palavras_pacote = ['pacote', 'embalagem', 'saco', 'sacola']
+    
+    # Verificar cada categoria
+    for palavra in palavras_metro:
+        if palavra in nome_lower:
+            return 'metro'
+    
+    for palavra in palavras_litro:
+        if palavra in nome_lower:
+            return 'litro'
+    
+    for palavra in palavras_kg:
+        if palavra in nome_lower:
+            return 'kg'
+    
+    for palavra in palavras_grama:
+        if palavra in nome_lower:
+            return 'grama'
+    
+    for palavra in palavras_pacote:
+        if palavra in nome_lower:
+            return 'pacote'
+    
+    for palavra in palavras_unidade:
+        if palavra in nome_lower:
+            return 'unidade'
+    
+    # Padrão se não detectar nada
+    return 'unidade'
+
 # ==================== BOXES PREDEFINIDAS ====================
 BOXES = [
     "Box Café da manhã/tarde",
@@ -1374,10 +1432,17 @@ def main():
                                          help="Este é o custo que será usado na Ficha Técnica")
                             
                             with col3:
+                                # Detectar unidade automaticamente
+                                unidade_detectada = detectar_unidade_material(nome_material)
+                                unidades_opcoes = ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"]
+                                indice_inicial = unidades_opcoes.index(unidade_detectada) if unidade_detectada in unidades_opcoes else 0
+                                
                                 unidade_med = st.selectbox(
                                     "Unidade de Medida",
-                                    ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"],
-                                    key=f"unid_manual_{idx}"
+                                    unidades_opcoes,
+                                    index=indice_inicial,
+                                    key=f"unid_manual_{idx}",
+                                    help=f"✨ Detectado: {unidade_detectada}"
                                 )
                                 
                                 # Botão para cadastrar como material
@@ -1589,10 +1654,17 @@ def main():
                                                      help="Este é o custo que será usado na Ficha Técnica")
                                         
                                         with col3:
+                                            # Detectar unidade automaticamente
+                                            unidade_detectada = detectar_unidade_material(nome_material)
+                                            unidades_opcoes = ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"]
+                                            indice_inicial = unidades_opcoes.index(unidade_detectada) if unidade_detectada in unidades_opcoes else 0
+                                            
                                             unidade_med = st.selectbox(
                                                 "Unidade de Medida",
-                                                ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"],
-                                                key=f"unid_{idx}"
+                                                unidades_opcoes,
+                                                index=indice_inicial,
+                                                key=f"unid_{idx}",
+                                                help=f"✨ Detectado: {unidade_detectada}"
                                             )
                                             
                                             # Botão para cadastrar como material
@@ -1782,10 +1854,17 @@ def main():
                                                      help="Este é o custo que será usado na Ficha Técnica")
                                         
                                         with col3:
+                                            # Detectar unidade automaticamente
+                                            unidade_detectada = detectar_unidade_material(nome_material)
+                                            unidades_opcoes = ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"]
+                                            indice_inicial = unidades_opcoes.index(unidade_detectada) if unidade_detectada in unidades_opcoes else 0
+                                            
                                             unidade_med = st.selectbox(
                                                 "Unidade de Medida",
-                                                ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"],
-                                                key=f"unid_cupom_{idx}"
+                                                unidades_opcoes,
+                                                index=indice_inicial,
+                                                key=f"unid_cupom_{idx}",
+                                                help=f"✨ Detectado: {unidade_detectada}"
                                             )
                                             
                                             # Botão para cadastrar como material
@@ -2662,10 +2741,13 @@ def main():
                                     with col4:
                                         if st.button("➕ Converter", key=f"conv_antigo_{idx}_{item['id']}", use_container_width=True):
                                             try:
+                                                # Detectar unidade automaticamente
+                                                unidade_auto = detectar_unidade_material(nome_limpo)
+                                                
                                                 material_data = {
                                                     "nome": nome_limpo,
                                                     "descricao": item.get('descricao', ''),
-                                                    "unidade_medida": "unidade",
+                                                    "unidade_medida": unidade_auto,
                                                     "estoque_atual": qtd_real,
                                                     "custo_unitario": custo_real,
                                                     "ultima_compra_data": datetime.now().date().isoformat(),
@@ -2732,13 +2814,97 @@ def main():
                 
                 if materiais.data:
                     import pandas as pd
+                    
+                    st.markdown("#### 🔧 Editar Materiais")
+                    st.info("💡 Clique em um material para editar unidade de medida, custo ou estoque")
+                    
+                    for mat in materiais.data:
+                        with st.expander(f"📦 {mat['nome']} ({mat['unidade_medida']}) - R$ {float(mat['custo_unitario']):.2f}"):
+                            with st.form(key=f"form_edit_{mat['id']}"):
+                                col1, col2, col3 = st.columns(3)
+                                
+                                with col1:
+                                    nome_edit = st.text_input("Nome", value=mat['nome'], key=f"nome_{mat['id']}")
+                                    
+                                    # Detectar unidade sugerida
+                                    unidade_sugerida = detectar_unidade_material(mat['nome'])
+                                    unidades_opcoes = ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"]
+                                    indice_atual = unidades_opcoes.index(mat['unidade_medida']) if mat['unidade_medida'] in unidades_opcoes else 0
+                                    
+                                    unidade_edit = st.selectbox(
+                                        "Unidade de Medida", 
+                                        unidades_opcoes,
+                                        index=indice_atual,
+                                        key=f"unid_{mat['id']}",
+                                        help=f"✨ Sugerido: {unidade_sugerida}"
+                                    )
+                                
+                                with col2:
+                                    custo_edit = st.number_input(
+                                        "Custo Unitário (R$)", 
+                                        value=float(mat['custo_unitario']),
+                                        min_value=0.0,
+                                        step=0.01,
+                                        format="%.4f",
+                                        key=f"custo_{mat['id']}"
+                                    )
+                                    estoque_edit = st.number_input(
+                                        "Estoque Atual", 
+                                        value=float(mat['estoque_atual']),
+                                        min_value=0.0,
+                                        step=1.0,
+                                        key=f"estoque_{mat['id']}"
+                                    )
+                                
+                                with col3:
+                                    fornecedor_edit = st.text_input(
+                                        "Fornecedor", 
+                                        value=mat.get('fornecedor_principal', ''),
+                                        key=f"forn_{mat['id']}"
+                                    )
+                                    descricao_edit = st.text_area(
+                                        "Descrição", 
+                                        value=mat.get('descricao', ''),
+                                        key=f"desc_{mat['id']}"
+                                    )
+                                
+                                col_btn1, col_btn2 = st.columns(2)
+                                with col_btn1:
+                                    if st.form_submit_button("💾 Salvar Alterações", use_container_width=True):
+                                        try:
+                                            supabase.table("singelo_materiais").update({
+                                                "nome": nome_edit,
+                                                "unidade_medida": unidade_edit,
+                                                "custo_unitario": custo_edit,
+                                                "estoque_atual": estoque_edit,
+                                                "fornecedor_principal": fornecedor_edit,
+                                                "descricao": descricao_edit,
+                                                "updated_at": datetime.now().isoformat()
+                                            }).eq("id", mat['id']).execute()
+                                            st.success("✅ Material atualizado!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Erro: {str(e)}")
+                                
+                                with col_btn2:
+                                    if st.form_submit_button("🗑️ Excluir", use_container_width=True):
+                                        try:
+                                            supabase.table("singelo_materiais").delete().eq("id", mat['id']).execute()
+                                            st.success("✅ Material excluído!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Erro: {str(e)}")
+                    
+                    # Tabela resumo
+                    st.markdown("---")
+                    st.markdown("#### 📊 Resumo de Materiais")
+                    
                     df_materiais = []
                     for mat in materiais.data:
                         df_materiais.append({
-                            "ID": mat['id'],
                             "Material": mat['nome'],
                             "Unidade": mat['unidade_medida'],
-                            "Custo/Un": f"R$ {float(mat['custo_unitario']):.2f}",
+                            "Custo/Un": f"R$ {float(mat['custo_unitario']):.4f}",
                             "Estoque": f"{float(mat['estoque_atual']):.2f}",
                             "Valor Estoque": f"R$ {float(mat['estoque_atual']) * float(mat['custo_unitario']):.2f}",
                             "Fornecedor": mat.get('fornecedor_principal', '-')
