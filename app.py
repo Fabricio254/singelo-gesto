@@ -2996,6 +2996,47 @@ def main():
             with tab1:
                 st.markdown("### 📦 Cadastro de Materiais")
                 
+                # Botão para corrigir nomes automaticamente
+                col_btn1, col_btn2 = st.columns([3, 1])
+                with col_btn2:
+                    if st.button("🔧 Corrigir Nomes dos Materiais", use_container_width=True, help="Recupera nomes originais da descrição"):
+                        try:
+                            # Buscar todos os materiais
+                            materiais = supabase.table("singelo_materiais").select("*").execute()
+                            
+                            if materiais.data:
+                                corrigidos = 0
+                                import re
+                                
+                                for mat in materiais.data:
+                                    nome_atual = mat.get('nome', '')
+                                    descricao = mat.get('descricao', '')
+                                    
+                                    # Se a descrição existe e é diferente do nome
+                                    if descricao and descricao != nome_atual:
+                                        # Verificar se a descrição começa com número + "unidades"
+                                        match = re.match(r'^(\d+)\s+(unidades?|un)\s+', descricao, re.IGNORECASE)
+                                        
+                                        # Se a descrição tem quantidade mas o nome não tem
+                                        if match and not re.match(r'^(\d+)\s+', nome_atual):
+                                            # Usar a descrição como nome
+                                            novo_nome = descricao[:100]  # Limitar a 100 caracteres
+                                            
+                                            supabase.table("singelo_materiais").update({
+                                                "nome": novo_nome,
+                                                "updated_at": datetime.now().isoformat()
+                                            }).eq("id", mat['id']).execute()
+                                            
+                                            corrigidos += 1
+                                
+                                if corrigidos > 0:
+                                    st.success(f"✅ {corrigidos} material(is) corrigido(s)!")
+                                    st.rerun()
+                                else:
+                                    st.info("ℹ️ Nenhum material precisou de correção")
+                        except Exception as e:
+                            st.error(f"Erro: {str(e)}")
+                
                 # Formulário de cadastro
                 with st.expander("➕ Adicionar Novo Material", expanded=False):
                     with st.form("form_material"):
