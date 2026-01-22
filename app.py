@@ -3252,28 +3252,8 @@ def main():
             with tab2:
                 st.markdown("### 🧾 Composição dos Produtos")
                 
-                # Buscar produtos únicos da tabela de vendas
-                try:
-                    vendas_response = supabase.table("singelo_vendas").select("produto").execute()
-                    if vendas_response.data:
-                        # Extrair produtos únicos e ordenar
-                        PRODUTOS = sorted(list(set([v['produto'] for v in vendas_response.data if v.get('produto')])))
-                    else:
-                        # Produtos padrão se não houver vendas cadastradas
-                        PRODUTOS = [
-                            "Box Pequena",
-                            "Box Média",
-                            "Box Grande",
-                            "Box Premium"
-                        ]
-                        st.info("💡 Cadastre vendas para ver os produtos disponíveis aqui!")
-                except Exception as e:
-                    st.error(f"Erro ao buscar produtos: {str(e)}")
-                    PRODUTOS = []
-                
-                if not PRODUTOS:
-                    st.warning("⚠️ Nenhum produto encontrado. Cadastre produtos em 💰 Lançar Venda primeiro!")
-                    PRODUTOS = ["Box Pequena"]  # Fallback
+                # Usar a mesma lista de produtos disponível em Lançar Venda
+                PRODUTOS = BOXES
                 
                 # Seletor de produto
                 col1, col2 = st.columns([2, 1])
