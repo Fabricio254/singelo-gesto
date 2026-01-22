@@ -3448,6 +3448,17 @@ def main():
                         material = item['singelo_materiais']
                         quantidade = float(item['quantidade'])
                         custo_unit = float(material['custo_unitario'])
+                        
+                        # Verificar se o material tem quantidade na embalagem (ex: "50 Ponteira...")
+                        import re
+                        nome_material = material['nome']
+                        qtd_embalagem = 1
+                        match = re.match(r'^(\d+)\s+(.+)', nome_material)
+                        if match:
+                            qtd_embalagem = int(match.group(1))
+                            # Ajustar custo unitário para unidade individual
+                            custo_unit = custo_unit / qtd_embalagem
+                        
                         custo_item = quantidade * custo_unit
                         custo_total_produto += custo_item
                         
@@ -3488,6 +3499,17 @@ def main():
                         material = item['singelo_materiais']
                         quantidade = float(item['quantidade'])
                         custo_unit = float(material['custo_unitario'])
+                        
+                        # Verificar se o material tem quantidade na embalagem (ex: "50 Ponteira...")
+                        import re
+                        nome_material = material['nome']
+                        qtd_embalagem = 1
+                        match = re.match(r'^(\d+)\s+(.+)', nome_material)
+                        if match:
+                            qtd_embalagem = int(match.group(1))
+                            # Ajustar custo unitário para unidade individual
+                            custo_unit = custo_unit / qtd_embalagem
+                        
                         custo_item = quantidade * custo_unit
                         
                         if produto not in custos_por_produto:
