@@ -2371,9 +2371,7 @@ def main():
                                 with col2:
                                     st.markdown("")
                                     st.markdown("")
-                                    if st.button("🌐 Abrir Meu Danfe", type="primary", use_container_width=True):
-                                        st.markdown(f'<meta http-equiv="refresh" content="0; url=https://meudanfe.com.br/#" target="_blank">', unsafe_allow_html=True)
-                                        st.link_button("🌐 Abrir Meu Danfe", "https://meudanfe.com.br/#", use_container_width=True)
+                                    st.link_button("🌐 Abrir Meu Danfe", "https://meudanfe.com.br/#", type="primary", use_container_width=True)
                                 
                                 # Opção alternativa: SEFAZ
                                 with st.expander("🔄 Opção alternativa: SEFAZ"):
