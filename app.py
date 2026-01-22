@@ -2348,23 +2348,49 @@ def main():
                                 
                                 st.warning("⚠️ Download automático não disponível")
                                 st.markdown(f"**Estado:** {uf} | **Chave:** `{chave_limpa}`")
-                                st.markdown("---")
-                                st.markdown("### 📥 Como obter o XML:")
                                 
-                                if resultado.get('sucesso') and resultado.get('url'):
-                                    st.markdown(f"""
-                                    1. 🔗 **[Acesse a SEFAZ-{uf}]({resultado['url']})**
-                                    2. Cole a chave: `{chave_limpa}`
-                                    3. Baixe o XML
-                                    4. Use a aba **"Importar Documento"** para fazer upload
+                                # Botão para copiar a chave
+                                st.code(chave_limpa, language=None)
+                                
+                                st.markdown("---")
+                                st.markdown("### 📥 Como baixar o XML:")
+                                
+                                # Opção principal: Meu Danfe
+                                st.info("💡 **Recomendado:** Use o site Meu Danfe para baixar o XML gratuitamente!")
+                                
+                                col1, col2 = st.columns([3, 1])
+                                with col1:
+                                    st.markdown("""
+                                    **Passo a passo:**
+                                    1. 🔗 Clique no botão ao lado para abrir o Meu Danfe
+                                    2. Cole a chave de acesso no campo indicado
+                                    3. Clique em **BUSCAR**
+                                    4. Baixe o **XML** da nota fiscal
+                                    5. Volte aqui e use a aba **"📄 Importar Documento"** para fazer upload
                                     """)
-                                else:
-                                    st.markdown(f"""
-                                    - Acesse o site da SEFAZ-{uf}
-                                    - Cole a chave: `{chave_limpa}`
-                                    - Baixe o XML e use "Importar Documento"
-                                    - **Ou escaneie o QR Code** do cupom para acesso rápido
-                                    """)
+                                with col2:
+                                    st.markdown("")
+                                    st.markdown("")
+                                    if st.button("🌐 Abrir Meu Danfe", type="primary", use_container_width=True):
+                                        st.markdown(f'<meta http-equiv="refresh" content="0; url=https://meudanfe.com.br/#" target="_blank">', unsafe_allow_html=True)
+                                        st.link_button("🌐 Abrir Meu Danfe", "https://meudanfe.com.br/#", use_container_width=True)
+                                
+                                # Opção alternativa: SEFAZ
+                                with st.expander("🔄 Opção alternativa: SEFAZ"):
+                                    if resultado.get('sucesso') and resultado.get('url'):
+                                        st.markdown(f"""
+                                        1. 🔗 **[Acesse a SEFAZ-{uf}]({resultado['url']})**
+                                        2. Cole a chave: `{chave_limpa}`
+                                        3. Baixe o XML
+                                        4. Use a aba **"Importar Documento"** para fazer upload
+                                        """)
+                                    else:
+                                        st.markdown(f"""
+                                        - Acesse o site da SEFAZ-{uf}
+                                        - Cole a chave: `{chave_limpa}`
+                                        - Baixe o XML e use "Importar Documento"
+                                        - **Ou escaneie o QR Code** do cupom para acesso rápido
+                                        """)
                                 
                                 # Opção de colar XML
                                 with st.expander("📄 Ou cole o conteúdo do XML aqui"):
