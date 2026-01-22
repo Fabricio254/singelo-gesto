@@ -2604,6 +2604,126 @@ def main():
                             else:
                                 st.warning("Preencha os campos obrigatórios (*)!")
                 
+                # Importar itens antigos de NF-es
+                st.markdown("---")
+                st.markdown("### 📥 Importar Itens de NF-es Antigas")
+                
+                # Buscar itens que ainda não são materiais
+                try:
+                    itens_antigos = supabase.table("singelo_itens_compras").select("*").order("created_at", desc=True).execute()
+                    
+                    if itens_antigos.data:
+                        # Filtrar apenas itens que ainda não foram convertidos
+                        materiais_existentes = supabase.table("singelo_materiais").select("nome").execute()
+                        nomes_materiais = [m['nome'].lower() for m in materiais_existentes.data] if materiais_existentes.data else []
+                        
+                        itens_nao_convertidos = [
+                            item for item in itens_antigos.data 
+                            if item['nome_produto'].lower() not in nomes_materiais
+                        ]
+                        
+                        if itens_nao_convertidos:
+                            st.info(f"💡 Encontrados **{len(itens_nao_convertidos)} itens** de NF-es antigas que ainda não foram convertidos em materiais!")
+                            
+                            with st.expander(f"📦 Ver {len(itens_nao_convertidos)} itens para converter"):
+                                for idx, item in enumerate(itens_nao_convertidos[:20]):  # Mostrar no máximo 20
+                                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                                    
+                                    with col1:
+                                        nome_original = item['nome_produto']
+                                        
+                                        # Detectar quantidade no nome
+                                        import re
+                                        qtd_embalagem = 1
+                                        nome_limpo = nome_original
+                                        match = re.match(r'(\d+)\s+(unidades?|un|pcs?|peças?)\s+(.+)', nome_original, re.IGNORECASE)
+                                        if match:
+                                            qtd_embalagem = int(match.group(1))
+                                            nome_limpo = match.group(3).strip()
+                                        
+                                        st.write(f"**{nome_limpo}**")
+                                        if qtd_embalagem > 1:
+                                            st.caption(f"✨ {qtd_embalagem} unidades/embalagem")
+                                    
+                                    with col2:
+                                        qtd = float(item['quantidade'])
+                                        valor_unit = float(item['valor_unitario'])
+                                        valor_total = float(item['valor_total'])
+                                        
+                                        # Calcular custo unitário real
+                                        qtd_real = qtd * qtd_embalagem
+                                        custo_real = valor_total / qtd_real if qtd_real > 0 else valor_unit
+                                        
+                                        st.metric("Custo/Un", f"R$ {custo_real:.4f}")
+                                    
+                                    with col3:
+                                        st.metric("Qtd", f"{qtd_real:.0f}")
+                                    
+                                    with col4:
+                                        if st.button("➕ Converter", key=f"conv_antigo_{idx}_{item['id']}", use_container_width=True):
+                                            try:
+                                                material_data = {
+                                                    "nome": nome_limpo,
+                                                    "descricao": item.get('descricao', ''),
+                                                    "unidade_medida": "unidade",
+                                                    "estoque_atual": qtd_real,
+                                                    "custo_unitario": custo_real,
+                                                    "ultima_compra_data": datetime.now().date().isoformat(),
+                                                    "fornecedor_principal": "NF-e Importada",
+                                                    "observacoes": f"Convertido de item antigo - {qtd_embalagem} unidades/embalagem"
+                                                }
+                                                supabase.table("singelo_materiais").insert(material_data).execute()
+                                                st.success(f"✅ Convertido!")
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Erro: {str(e)}")
+                                
+                                # Botão para converter todos
+                                if st.button("✨ Converter TODOS os itens em materiais", type="primary", use_container_width=True):
+                                    sucesso = 0
+                                    erros = 0
+                                    
+                                    for item in itens_nao_convertidos:
+                                        try:
+                                            nome_original = item['nome_produto']
+                                            qtd_embalagem = 1
+                                            nome_limpo = nome_original
+                                            
+                                            import re
+                                            match = re.match(r'(\d+)\s+(unidades?|un|pcs?|peças?)\s+(.+)', nome_original, re.IGNORECASE)
+                                            if match:
+                                                qtd_embalagem = int(match.group(1))
+                                                nome_limpo = match.group(3).strip()
+                                            
+                                            qtd = float(item['quantidade'])
+                                            valor_total = float(item['valor_total'])
+                                            qtd_real = qtd * qtd_embalagem
+                                            custo_real = valor_total / qtd_real if qtd_real > 0 else float(item['valor_unitario'])
+                                            
+                                            material_data = {
+                                                "nome": nome_limpo,
+                                                "descricao": item.get('descricao', ''),
+                                                "unidade_medida": "unidade",
+                                                "estoque_atual": qtd_real,
+                                                "custo_unitario": custo_real,
+                                                "ultima_compra_data": datetime.now().date().isoformat(),
+                                                "fornecedor_principal": "NF-e Importada",
+                                                "observacoes": f"Convertido automaticamente - {qtd_embalagem} unidades/embalagem"
+                                            }
+                                            supabase.table("singelo_materiais").insert(material_data).execute()
+                                            sucesso += 1
+                                        except:
+                                            erros += 1
+                                    
+                                    st.success(f"✅ Conversão concluída! {sucesso} materiais criados, {erros} erros.")
+                                    st.rerun()
+                        else:
+                            st.success("✅ Todos os itens de NF-es antigas já foram convertidos em materiais!")
+                    else:
+                        st.info("Nenhum item antigo encontrado.")
+                except Exception as e:
+                    st.warning(f"Não foi possível verificar itens antigos: {str(e)}")
+                
                 # Listar materiais cadastrados
                 st.markdown("---")
                 st.markdown("### 📋 Materiais Cadastrados")
