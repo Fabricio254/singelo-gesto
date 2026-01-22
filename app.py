@@ -1220,18 +1220,17 @@ def main():
             
             if data_inicio_filtro and data_fim_filtro and data_inicio_filtro > data_fim_filtro:
                 st.error("❌ A data de início deve ser anterior à data de fim!")
+            
+            # Mostrar período selecionado
+            if data_inicio_filtro or data_fim_filtro:
+                periodo_texto = "Período: "
+                if data_inicio_filtro:
+                    periodo_texto += f"de {data_inicio_filtro.strftime('%d/%m/%Y')}"
+                if data_fim_filtro:
+                    periodo_texto += f" até {data_fim_filtro.strftime('%d/%m/%Y')}"
+                st.info(f"📊 {periodo_texto}")
             else:
-        
-        # Mostrar período selecionado
-        if data_inicio_filtro or data_fim_filtro:
-            periodo_texto = "Período: "
-            if data_inicio_filtro:
-                periodo_texto += f"de {data_inicio_filtro.strftime('%d/%m/%Y')}"
-            if data_fim_filtro:
-                periodo_texto += f" até {data_fim_filtro.strftime('%d/%m/%Y')}"
-            st.info(f"📊 {periodo_texto}")
-        else:
-            st.info("📊 Mostrando todos os dados")
+                st.info("📊 Mostrando todos os dados")
         
         st.markdown("---")
         
