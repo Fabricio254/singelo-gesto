@@ -1604,8 +1604,121 @@ def main():
                                         </div>
                                     """, unsafe_allow_html=True)
                                     st.balloons()
+                                    
+                                    # Guardar itens no session state para converter em materiais
+                                    st.session_state.itens_importados_cupom = dados.get('itens', [])
+                                    st.session_state.fornecedor_cupom = dados.get('fornecedor', 'Cupom Fiscal')
+                                    
                                 except Exception as e:
                                     st.error(f"❌ Erro ao registrar: {str(e)}")
+                            
+                            # Seção para converter itens em materiais
+                            if 'itens_importados_cupom' in st.session_state and st.session_state.itens_importados_cupom:
+                                st.markdown("---")
+                                st.markdown("### 📦 Converter Itens em Materiais para Ficha Técnica")
+                                st.info("💡 Os itens deste cupom podem ser cadastrados como materiais para usar na composição das Boxes!")
+                                
+                                for idx, item in enumerate(st.session_state.itens_importados_cupom):
+                                    with st.expander(f"📦 {item.get('nome', 'Produto')} - R$ {float(item.get('valor_total', 0)):,.2f}"):
+                                        col1, col2, col3 = st.columns([2, 1, 1])
+                                        
+                                        with col1:
+                                            st.write(f"**Nome original:** {item.get('nome', '')}")
+                                            st.write(f"**Descrição:** {item.get('descricao', '-')}")
+                                            
+                                            # Detectar quantidade no nome (ex: "50 Unidades...")
+                                            nome_original = item.get('nome', '')
+                                            qtd_embalagem = 1
+                                            nome_limpo = nome_original
+                                            
+                                            # Tentar extrair quantidade do nome
+                                            import re
+                                            match = re.match(r'(\d+)\s+(unidades?|un|pcs?|peças?)\s+(.+)', nome_original, re.IGNORECASE)
+                                            if match:
+                                                qtd_embalagem = int(match.group(1))
+                                                nome_limpo = match.group(3).strip()
+                                                st.success(f"✨ Detectado: **{qtd_embalagem} unidades** na embalagem")
+                                            
+                                            # Permitir edição
+                                            nome_material = st.text_input(
+                                                "Nome do Material", 
+                                                value=nome_limpo,
+                                                key=f"nome_mat_cupom_{idx}"
+                                            )
+                                            
+                                            qtd_embalagem_edit = st.number_input(
+                                                "Quantas unidades vêm na embalagem?",
+                                                min_value=1,
+                                                value=qtd_embalagem,
+                                                help="Ex: Se comprou '50 Unidades Balão', coloque 50",
+                                                key=f"qtd_emb_cupom_{idx}"
+                                            )
+                                        
+                                        with col2:
+                                            qtd_comprada = float(item.get('quantidade', 1))
+                                            valor_total_item = float(item.get('valor_total', 0))
+                                            
+                                            st.metric("Qtd Comprada", f"{qtd_comprada:.0f}")
+                                            st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
+                                            
+                                            # Calcular valor unitário real
+                                            qtd_total_unidades = qtd_comprada * qtd_embalagem_edit
+                                            valor_unitario_real = valor_total_item / qtd_total_unidades if qtd_total_unidades > 0 else 0
+                                            
+                                            st.metric("Total de Unidades", f"{qtd_total_unidades:.0f}")
+                                            st.metric("Custo/Unidade", f"R$ {valor_unitario_real:.4f}", 
+                                                     help="Este é o custo que será usado na Ficha Técnica")
+                                        
+                                        with col3:
+                                            unidade_med = st.selectbox(
+                                                "Unidade de Medida",
+                                                ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo"],
+                                                key=f"unid_cupom_{idx}"
+                                            )
+                                            
+                                            # Botão para cadastrar como material
+                                            if st.button(f"➕ Cadastrar como Material", key=f"btn_mat_cupom_{idx}", use_container_width=True):
+                                                try:
+                                                    # Verificar se já existe
+                                                    existe = supabase.table("singelo_materiais").select("id, custo_unitario").eq("nome", nome_material).execute()
+                                                    
+                                                    if existe.data:
+                                                        # Atualizar custo
+                                                        material_id = existe.data[0]['id']
+                                                        custo_antigo = float(existe.data[0]['custo_unitario'])
+                                                        
+                                                        supabase.table("singelo_materiais").update({
+                                                            "custo_unitario": valor_unitario_real,
+                                                            "ultima_compra_data": datetime.now().date().isoformat(),
+                                                            "fornecedor_principal": st.session_state.fornecedor_cupom,
+                                                            "estoque_atual": qtd_total_unidades,
+                                                            "updated_at": datetime.now().isoformat()
+                                                        }).eq("id", material_id).execute()
+                                                        
+                                                        st.success(f"✅ Material atualizado! Custo: R$ {custo_antigo:.4f} → R$ {valor_unitario_real:.4f}")
+                                                    else:
+                                                        # Cadastrar novo
+                                                        material_data = {
+                                                            "nome": nome_material,
+                                                            "descricao": item.get('descricao', ''),
+                                                            "unidade_medida": unidade_med,
+                                                            "estoque_atual": qtd_total_unidades,
+                                                            "custo_unitario": valor_unitario_real,
+                                                            "ultima_compra_data": datetime.now().date().isoformat(),
+                                                            "fornecedor_principal": st.session_state.fornecedor_cupom,
+                                                            "observacoes": f"Importado de Cupom Fiscal - {qtd_embalagem_edit} unidades por embalagem"
+                                                        }
+                                                        supabase.table("singelo_materiais").insert(material_data).execute()
+                                                        st.success(f"✅ Material '{nome_material}' cadastrado com sucesso!")
+                                                    
+                                                    st.rerun()
+                                                except Exception as e:
+                                                    st.error(f"Erro: {str(e)}")
+                                
+                                if st.button("🔄 Limpar Lista", key="limpar_itens_cupom"):
+                                    del st.session_state.itens_importados_cupom
+                                    del st.session_state.fornecedor_cupom
+                                    st.rerun()
                         else:
                             st.error(dados['mensagem'])
                     except Exception as e:
