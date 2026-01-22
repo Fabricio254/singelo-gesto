@@ -1171,52 +1171,56 @@ def main():
     if opcao == "📈 Dashboard":
         st.markdown("## 📈 Dashboard Financeiro")
         
-        # Filtros de período
-        st.markdown("### 📅 Filtrar por Período")
-        col1, col2, col3 = st.columns([2, 2, 1])
+        # Tabs principais do dashboard
+        tab1, tab2 = st.tabs(["💰 Resumo Financeiro", "📊 Análise de Lucro"])
         
-        # Data padrão: dia 12 do mês atual até dia 12 do próximo mês
-        hoje = datetime.now()
-        data_inicio_padrao = datetime(hoje.year, hoje.month, 12)
-        
-        # Calcular dia 12 do próximo mês
-        mes_fim = hoje.month + 1
-        ano_fim = hoje.year
-        if mes_fim > 12:
-            mes_fim = 1
-            ano_fim += 1
-        data_fim_padrao = datetime(ano_fim, mes_fim, 12)
-        
-        with col1:
-            data_inicio = st.date_input(
-                "Data Início",
-                value=data_inicio_padrao,
-                format="DD/MM/YYYY",
-                help="Data de início do período (padrão: dia 12 do mês atual)",
-                key="data_inicio_dash"
-            )
-        
-        with col2:
-            data_fim = st.date_input(
-                "Data Fim",
-                value=data_fim_padrao,
-                format="DD/MM/YYYY",
-                help="Data de fim do período (padrão: dia 12 do próximo mês)",
-                key="data_fim_dash"
-            )
-        
-        with col3:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔄 Limpar Filtros", key="limpar_filtros"):
-                st.rerun()
-        
-        # Converter None para None explicitamente
-        data_inicio_filtro = data_inicio if data_inicio else None
-        data_fim_filtro = data_fim if data_fim else None
-        
-        if data_inicio_filtro and data_fim_filtro and data_inicio_filtro > data_fim_filtro:
-            st.error("❌ A data de início deve ser anterior à data de fim!")
-            return
+        with tab1:
+            # Filtros de período
+            st.markdown("### 📅 Filtrar por Período")
+            col1, col2, col3 = st.columns([2, 2, 1])
+            
+            # Data padrão: dia 12 do mês atual até dia 12 do próximo mês
+            hoje = datetime.now()
+            data_inicio_padrao = datetime(hoje.year, hoje.month, 12)
+            
+            # Calcular dia 12 do próximo mês
+            mes_fim = hoje.month + 1
+            ano_fim = hoje.year
+            if mes_fim > 12:
+                mes_fim = 1
+                ano_fim += 1
+            data_fim_padrao = datetime(ano_fim, mes_fim, 12)
+            
+            with col1:
+                data_inicio = st.date_input(
+                    "Data Início",
+                    value=data_inicio_padrao,
+                    format="DD/MM/YYYY",
+                    help="Data de início do período (padrão: dia 12 do mês atual)",
+                    key="data_inicio_dash"
+                )
+            
+            with col2:
+                data_fim = st.date_input(
+                    "Data Fim",
+                    value=data_fim_padrao,
+                    format="DD/MM/YYYY",
+                    help="Data de fim do período (padrão: dia 12 do próximo mês)",
+                    key="data_fim_dash"
+                )
+            
+            with col3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🔄 Limpar Filtros", key="limpar_filtros"):
+                    st.rerun()
+            
+            # Converter None para None explicitamente
+            data_inicio_filtro = data_inicio if data_inicio else None
+            data_fim_filtro = data_fim if data_fim else None
+            
+            if data_inicio_filtro and data_fim_filtro and data_inicio_filtro > data_fim_filtro:
+                st.error("❌ A data de início deve ser anterior à data de fim!")
+            else:
         
         # Mostrar período selecionado
         if data_inicio_filtro or data_fim_filtro:
@@ -1334,8 +1338,181 @@ def main():
                             💵 R$ {float(venda['valor_total']):,.2f}
                         </div>
                     """, unsafe_allow_html=True)
-            else:
-                st.info("Nenhuma venda registrada ainda")
+                else:
+                    st.info("Nenhuma venda registrada ainda")
+        
+        # ===== TAB 2: ANÁLISE DE LUCRO =====
+        with tab2:
+            st.markdown("### 📊 Análise de Lucro por Produto")
+            
+            try:
+                # Buscar todas as fichas técnicas
+                fichas = supabase.table("singelo_fichas_tecnicas").select("*, singelo_materiais(*)").execute()
+                
+                if fichas.data:
+                    # Calcular custo de produção de cada produto
+                    custos_produtos = {}
+                    
+                    for item in fichas.data:
+                        produto = item['produto']
+                        material = item['singelo_materiais']
+                        quantidade = float(item['quantidade'])
+                        custo_unit = float(material['custo_unitario'])
+                        custo_item = quantidade * custo_unit
+                        
+                        if produto not in custos_produtos:
+                            custos_produtos[produto] = {
+                                'custo_total': 0,
+                                'materiais': []
+                            }
+                        
+                        custos_produtos[produto]['custo_total'] += custo_item
+                        custos_produtos[produto]['materiais'].append({
+                            'nome': material['nome'],
+                            'quantidade': quantidade,
+                            'unidade': material['unidade_medida'],
+                            'custo': custo_item
+                        })
+                    
+                    # Buscar vendas para comparar
+                    vendas = supabase.table("singelo_vendas").select("*").execute()
+                    
+                    # Calcular preço médio de venda por produto
+                    precos_venda = {}
+                    qtd_vendas = {}
+                    
+                    if vendas.data:
+                        for venda in vendas.data:
+                            produto = venda['produto']
+                            valor = float(venda['valor_total'])
+                            qtd = int(venda['quantidade'])
+                            
+                            if produto not in precos_venda:
+                                precos_venda[produto] = []
+                                qtd_vendas[produto] = 0
+                            
+                            precos_venda[produto].append(valor / qtd)
+                            qtd_vendas[produto] += qtd
+                    
+                    # Mostrar análise por produto
+                    st.markdown("#### 💰 Margem de Lucro por Box")
+                    
+                    produtos_com_lucro = []
+                    
+                    for produto, dados in custos_produtos.items():
+                        custo_producao = dados['custo_total']
+                        
+                        # Buscar preço de venda
+                        if produto in precos_venda and precos_venda[produto]:
+                            preco_medio_venda = sum(precos_venda[produto]) / len(precos_venda[produto])
+                            lucro_unitario = preco_medio_venda - custo_producao
+                            margem_pct = (lucro_unitario / preco_medio_venda * 100) if preco_medio_venda > 0 else 0
+                            
+                            # Determinar cor baseado na margem
+                            if margem_pct >= 40:
+                                cor = "#28A745"  # Verde
+                                status = "✅ Ótima"
+                            elif margem_pct >= 25:
+                                cor = "#FFC107"  # Amarelo
+                                status = "⚠️ Boa"
+                            else:
+                                cor = "#DC3545"  # Vermelho
+                                status = "❌ Baixa"
+                            
+                            produtos_com_lucro.append({
+                                'produto': produto,
+                                'custo': custo_producao,
+                                'preco': preco_medio_venda,
+                                'lucro': lucro_unitario,
+                                'margem': margem_pct,
+                                'cor': cor,
+                                'status': status,
+                                'qtd_vendida': qtd_vendas[produto]
+                            })
+                        else:
+                            # Produto sem vendas ainda
+                            produtos_com_lucro.append({
+                                'produto': produto,
+                                'custo': custo_producao,
+                                'preco': 0,
+                                'lucro': 0,
+                                'margem': 0,
+                                'cor': "#6C757D",
+                                'status': "⚪ Sem vendas",
+                                'qtd_vendida': 0
+                            })
+                    
+                    # Ordenar por margem (maior primeiro)
+                    produtos_com_lucro.sort(key=lambda x: x['margem'], reverse=True)
+                    
+                    # Mostrar cards de produtos
+                    for prod in produtos_com_lucro:
+                        with st.expander(f"{prod['status']} **{prod['produto']}** - Margem: {prod['margem']:.1f}%"):
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                st.metric("💵 Custo Produção", f"R$ {prod['custo']:.2f}")
+                            with col2:
+                                st.metric("💰 Preço Venda", f"R$ {prod['preco']:.2f}")
+                            with col3:
+                                st.metric("📊 Lucro/Unidade", f"R$ {prod['lucro']:.2f}")
+                            with col4:
+                                st.metric("📈 Margem", f"{prod['margem']:.1f}%")
+                            
+                            if prod['qtd_vendida'] > 0:
+                                lucro_total = prod['lucro'] * prod['qtd_vendida']
+                                st.info(f"📦 Vendidas: **{prod['qtd_vendida']}** unidades | 💰 Lucro total: **R$ {lucro_total:.2f}**")
+                            
+                            # Mostrar composição de custos
+                            st.markdown("**Composição de custos:**")
+                            materiais_info = custos_produtos[prod['produto']]['materiais']
+                            for mat in materiais_info:
+                                percentual = (mat['custo'] / prod['custo'] * 100) if prod['custo'] > 0 else 0
+                                st.write(f"- {mat['nome']}: R$ {mat['custo']:.2f} ({percentual:.1f}%)")
+                    
+                    # Alertas e recomendações
+                    st.markdown("---")
+                    st.markdown("### ⚠️ Alertas e Recomendações")
+                    
+                    alertas = []
+                    
+                    for prod in produtos_com_lucro:
+                        if prod['margem'] < 25 and prod['qtd_vendida'] > 0:
+                            alertas.append(f"🔴 **{prod['produto']}**: Margem muito baixa ({prod['margem']:.1f}%). Considere aumentar o preço ou reduzir custos.")
+                        elif prod['margem'] == 0 and prod['qtd_vendida'] == 0:
+                            alertas.append(f"⚪ **{prod['produto']}**: Produto sem vendas ainda. Custo de produção: R$ {prod['custo']:.2f}")
+                    
+                    if alertas:
+                        for alerta in alertas:
+                            st.warning(alerta)
+                    else:
+                        st.success("✅ Todas as margens estão saudáveis!")
+                    
+                    # Gráfico de margem de lucro
+                    st.markdown("---")
+                    st.markdown("### 📊 Visualização de Margens")
+                    
+                    import pandas as pd
+                    df_margens = pd.DataFrame([
+                        {
+                            "Produto": p['produto'],
+                            "Margem (%)": p['margem'],
+                            "Lucro (R$)": p['lucro']
+                        }
+                        for p in produtos_com_lucro if p['qtd_vendida'] > 0
+                    ])
+                    
+                    if not df_margens.empty:
+                        st.bar_chart(df_margens.set_index("Produto")["Margem (%)"])
+                    else:
+                        st.info("Sem dados de vendas para exibir gráfico")
+                    
+                else:
+                    st.warning("⚠️ Nenhuma ficha técnica cadastrada ainda. Vá em 🧾 Ficha Técnica para cadastrar os custos de produção!")
+            
+            except Exception as e:
+                st.error(f"Erro ao carregar análise: {str(e)}")
+                st.info("Certifique-se de que as tabelas de materiais e fichas técnicas estão criadas no Supabase.")
     
     # ==================== LANÇAR COMPRA ====================
     elif opcao == "🛒 Lançar Compra":
