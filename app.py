@@ -2078,23 +2078,38 @@ def main():
                                         with col_btn:
                                             if st.button(f"➕ Cadastrar como Material", key=f"btn_mat_{idx}", use_container_width=True):
                                                 try:
-                                                    # Verificar se já existe
-                                                    existe = supabase.table("singelo_materiais").select("id, custo_unitario").eq("nome", nome_material).execute()
+                                                    # Verificar se já existe EXATAMENTE o mesmo material
+                                                    existe = supabase.table("singelo_materiais").select("*").eq("nome", nome_material).execute()
                                                     
                                                     if existe.data:
-                                                        # Atualizar custo
+                                                        # Material já existe - SOMAR ao estoque e recalcular custo médio
                                                         material_id = existe.data[0]['id']
                                                         custo_antigo = float(existe.data[0]['custo_unitario'])
+                                                        estoque_antigo = float(existe.data[0]['estoque_atual'])
+                                                        
+                                                        # Calcular custo médio ponderado
+                                                        valor_estoque_antigo = estoque_antigo * custo_antigo
+                                                        valor_compra_nova = qtd_real_unidades * valor_unitario_real
+                                                        novo_estoque = estoque_antigo + qtd_real_unidades
+                                                        
+                                                        if novo_estoque > 0:
+                                                            custo_medio = (valor_estoque_antigo + valor_compra_nova) / novo_estoque
+                                                        else:
+                                                            custo_medio = valor_unitario_real
                                                         
                                                         supabase.table("singelo_materiais").update({
-                                                            "custo_unitario": valor_unitario_real,
+                                                            "custo_unitario": custo_medio,
                                                             "ultima_compra_data": datetime.now().date().isoformat(),
                                                             "fornecedor_principal": st.session_state.fornecedor_nfe,
-                                                            "estoque_atual": qtd_real_unidades,  # Adicionar ao estoque
+                                                            "estoque_atual": novo_estoque,  # SOMAR ao estoque
                                                             "updated_at": datetime.now().isoformat()
                                                         }).eq("id", material_id).execute()
                                                         
-                                                        st.success(f"✅ Material atualizado! Custo: R$ {custo_antigo:.4f} → R$ {valor_unitario_real:.4f}")
+                                                        st.success(f"""
+                                                        ✅ Material atualizado com custo médio ponderado!
+                                                        - Estoque: {estoque_antigo:.4f} + {qtd_real_unidades:.4f} = {novo_estoque:.4f}
+                                                        - Custo: R$ {custo_antigo:.4f} → R$ {custo_medio:.4f}
+                                                        """)
                                                     else:
                                                         # Cadastrar novo - usar descrição original da NF-e
                                                         nome_original_item = item.get('nome', '')
@@ -2318,23 +2333,38 @@ def main():
                                         with col_btn:
                                             if st.button(f"➕ Cadastrar como Material", key=f"btn_mat_cupom_{idx}", use_container_width=True):
                                                 try:
-                                                    # Verificar se já existe
-                                                    existe = supabase.table("singelo_materiais").select("id, custo_unitario").eq("nome", nome_material).execute()
+                                                    # Verificar se já existe EXATAMENTE o mesmo material
+                                                    existe = supabase.table("singelo_materiais").select("*").eq("nome", nome_material).execute()
                                                     
                                                     if existe.data:
-                                                        # Atualizar custo
+                                                        # Material já existe - SOMAR ao estoque e recalcular custo médio
                                                         material_id = existe.data[0]['id']
                                                         custo_antigo = float(existe.data[0]['custo_unitario'])
+                                                        estoque_antigo = float(existe.data[0]['estoque_atual'])
+                                                        
+                                                        # Calcular custo médio ponderado
+                                                        valor_estoque_antigo = estoque_antigo * custo_antigo
+                                                        valor_compra_nova = qtd_real_unidades * valor_unitario_real
+                                                        novo_estoque = estoque_antigo + qtd_real_unidades
+                                                        
+                                                        if novo_estoque > 0:
+                                                            custo_medio = (valor_estoque_antigo + valor_compra_nova) / novo_estoque
+                                                        else:
+                                                            custo_medio = valor_unitario_real
                                                         
                                                         supabase.table("singelo_materiais").update({
-                                                            "custo_unitario": valor_unitario_real,
+                                                            "custo_unitario": custo_medio,
                                                             "ultima_compra_data": datetime.now().date().isoformat(),
                                                             "fornecedor_principal": st.session_state.fornecedor_cupom,
-                                                            "estoque_atual": qtd_real_unidades,
+                                                            "estoque_atual": novo_estoque,  # SOMAR ao estoque
                                                             "updated_at": datetime.now().isoformat()
                                                         }).eq("id", material_id).execute()
                                                         
-                                                        st.success(f"✅ Material atualizado! Custo: R$ {custo_antigo:.4f} → R$ {valor_unitario_real:.4f}")
+                                                        st.success(f"""
+                                                        ✅ Material atualizado com custo médio ponderado!
+                                                        - Estoque: {estoque_antigo:.4f} + {qtd_real_unidades:.4f} = {novo_estoque:.4f}
+                                                        - Custo: R$ {custo_antigo:.4f} → R$ {custo_medio:.4f}
+                                                        """)
                                                     else:
                                                         # Cadastrar novo - usar descrição original do Cupom
                                                         nome_original_item = item.get('nome', '')
