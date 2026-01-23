@@ -3091,79 +3091,77 @@ def main():
                 
                 # Formulário de cadastro
                 with st.expander("➕ Adicionar Novo Material", expanded=False):
-                    with st.form("form_material"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            nome_material = st.text_input("Nome do Material*", placeholder="Ex: Balão Bubble 24 polegadas")
-                            unidade = st.selectbox("Unidade de Medida*", 
-                                ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo", "caixa"])
-                            custo_unitario = st.number_input("Custo Unitário (R$)*", min_value=0.0, step=0.01, format="%.2f")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        nome_material = st.text_input("Nome do Material*", placeholder="Ex: Balão Bubble 24 polegadas", key="nome_mat_cad")
+                        unidade = st.selectbox("Unidade de Medida*", 
+                            ["unidade", "metro", "centímetro", "litro", "mililitro", "kg", "grama", "pacote", "rolo", "caixa"],
+                            key="unid_mat_cad")
+                        custo_unitario = st.number_input("Custo Unitário (R$)*", min_value=0.0, step=0.01, format="%.2f", key="custo_mat_cad")
+                    
+                    with col2:
+                        descricao_material = st.text_area("Descrição", placeholder="Ex: Balão transparente 24 polegadas", key="desc_mat_cad")
+                        estoque_inicial = st.number_input("Estoque Inicial", min_value=0.0, step=1.0, value=0.0, key="est_mat_cad")
+                        fornecedor = st.text_input("Fornecedor Principal", placeholder="Nome do fornecedor", key="forn_mat_cad")
+                    
+                    # Se for metro/centímetro/rolo, mostrar campos de área
+                    comprimento_val = 0.0
+                    largura_val = 0.0
+                    if unidade in ['metro', 'centímetro', 'rolo']:
+                        st.markdown("---")
+                        st.info(f"💡 Para materiais em **{unidade}**, você pode informar as dimensões totais (comprimento × largura)")
                         
-                        with col2:
-                            descricao_material = st.text_area("Descrição", placeholder="Ex: Balão transparente 24 polegadas")
-                            estoque_inicial = st.number_input("Estoque Inicial", min_value=0.0, step=1.0, value=0.0)
-                            fornecedor = st.text_input("Fornecedor Principal", placeholder="Nome do fornecedor")
+                        col_dim1, col_dim2 = st.columns(2)
+                        with col_dim1:
+                            comprimento_val = st.number_input(
+                                f"Comprimento ({unidade})",
+                                min_value=0.0,
+                                step=0.01,
+                                format="%.4f",
+                                help="Ex: 2.00 para 2 metros ou 200 para 200cm",
+                                key="comp_cadastro"
+                            )
+                        with col_dim2:
+                            largura_val = st.number_input(
+                                f"Largura ({unidade})",
+                                min_value=0.0,
+                                step=0.01,
+                                format="%.4f",
+                                help="Ex: 0.30 para 30cm ou 30 para 30cm",
+                                key="larg_cadastro"
+                            )
                         
-                        # Se for metro/centímetro/rolo, mostrar campos de área
-                        comprimento_val = 0.0
-                        largura_val = 0.0
-                        if unidade in ['metro', 'centímetro', 'rolo']:
-                            st.markdown("---")
-                            st.info(f"💡 Para materiais em **{unidade}**, você pode informar as dimensões totais (comprimento × largura)")
-                            
-                            col_dim1, col_dim2 = st.columns(2)
-                            with col_dim1:
-                                comprimento_val = st.number_input(
-                                    f"Comprimento ({unidade})",
-                                    min_value=0.0,
-                                    step=0.01,
-                                    format="%.4f",
-                                    help="Ex: 2.00 para 2 metros ou 200 para 200cm",
-                                    key="comp_cadastro"
-                                )
-                            with col_dim2:
-                                largura_val = st.number_input(
-                                    f"Largura ({unidade})",
-                                    min_value=0.0,
-                                    step=0.01,
-                                    format="%.4f",
-                                    help="Ex: 0.30 para 30cm ou 30 para 30cm",
-                                    key="larg_cadastro"
-                                )
-                            
-                            if comprimento_val > 0 and largura_val > 0:
-                                area_total = comprimento_val * largura_val
-                                st.success(f"📐 Área total: **{area_total:.4f} {unidade}²**")
-                                st.caption(f"O estoque inicial será {area_total:.4f} {unidade}² (ao invés de {estoque_inicial:.2f})")
+                        if comprimento_val > 0 and largura_val > 0:
+                            area_total = comprimento_val * largura_val
+                            st.success(f"📐 Área total: **{area_total:.4f} {unidade}²**")
+                            st.caption(f"O estoque inicial será {area_total:.4f} {unidade}² (ao invés de {estoque_inicial:.2f})")
+                    
+                    observacoes_mat = st.text_area("Observações", placeholder="Informações adicionais...", key="obs_mat_cad")
+                    
+                    if st.button("💾 Salvar Material", use_container_width=True, type="primary", key="btn_salvar_mat"):
+                        # Se tiver área calculada, usar ela como estoque inicial
+                        if unidade in ['metro', 'centímetro', 'rolo'] and comprimento_val > 0 and largura_val > 0:
+                            estoque_inicial = comprimento_val * largura_val
                         
-                        observacoes_mat = st.text_area("Observações", placeholder="Informações adicionais...")
-                        
-                        submitted = st.form_submit_button("💾 Salvar Material", use_container_width=True)
-                        
-                        if submitted:
-                            # Se tiver área calculada, usar ela como estoque inicial
-                            if unidade in ['metro', 'centímetro', 'rolo'] and comprimento_val > 0 and largura_val > 0:
-                                estoque_inicial = comprimento_val * largura_val
-                            
-                            if nome_material and custo_unitario > 0:
-                                try:
-                                    material_data = {
-                                        "nome": nome_material,
-                                        "descricao": descricao_material,
-                                        "unidade_medida": unidade,
-                                        "estoque_atual": float(estoque_inicial),
-                                        "custo_unitario": float(custo_unitario),
-                                        "fornecedor_principal": fornecedor,
-                                        "observacoes": observacoes_mat,
-                                        "ultima_compra_data": datetime.now().date().isoformat()
-                                    }
-                                    supabase.table("singelo_materiais").insert(material_data).execute()
-                                    st.success(f"✅ Material '{nome_material}' cadastrado com sucesso!")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Erro ao salvar: {str(e)}")
-                            else:
-                                st.warning("Preencha os campos obrigatórios (*)!")
+                        if nome_material and custo_unitario > 0:
+                            try:
+                                material_data = {
+                                    "nome": nome_material,
+                                    "descricao": descricao_material,
+                                    "unidade_medida": unidade,
+                                    "estoque_atual": float(estoque_inicial),
+                                    "custo_unitario": float(custo_unitario),
+                                    "fornecedor_principal": fornecedor,
+                                    "observacoes": observacoes_mat,
+                                    "ultima_compra_data": datetime.now().date().isoformat()
+                                }
+                                supabase.table("singelo_materiais").insert(material_data).execute()
+                                st.success(f"✅ Material '{nome_material}' cadastrado com sucesso!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao salvar: {str(e)}")
+                        else:
+                            st.warning("Preencha os campos obrigatórios (*)!")
                 
                 # Importar itens antigos de NF-es
                 st.markdown("---")
