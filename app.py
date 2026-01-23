@@ -249,7 +249,8 @@ BOXES = [
     "Box Casamento",
     "Box Aniversário",
     "Box Formatura",
-    "Box de Flor com Caneca"
+    "Box de Flor com Caneca",
+    "Box Estrutura"
 ]
 
 # ==================== TAMANHOS E CUSTOS ====================
