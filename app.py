@@ -1689,8 +1689,44 @@ def main():
                                     key=f"unid_manual_{idx}",
                                     help=f"✨ Detectado: {unidade_detectada}"
                                 )
+                            
+                            # Se for metro/centímetro/rolo, mostrar campos de área
+                            if unidade_med in ['metro', 'centímetro', 'rolo']:
+                                st.markdown("---")
+                                st.info(f"💡 Para materiais em **{unidade_med}**, você pode calcular por área (comprimento × largura)")
                                 
-                                # Botão para cadastrar como material
+                                col_calc1, col_calc2 = st.columns(2)
+                                with col_calc1:
+                                    comprimento = st.number_input(
+                                        f"Comprimento ({unidade_med})",
+                                        min_value=0.0,
+                                        step=0.01,
+                                        format="%.4f",
+                                        help="Ex: 30 para 30 metros",
+                                        key=f"comp_manual_{idx}"
+                                    )
+                                with col_calc2:
+                                    largura = st.number_input(
+                                        f"Largura ({unidade_med})",
+                                        min_value=0.0,
+                                        step=0.01,
+                                        format="%.4f",
+                                        help="Ex: 2 para 2 metros",
+                                        key=f"larg_manual_{idx}"
+                                    )
+                                
+                                if comprimento > 0 and largura > 0:
+                                    area_calculada = comprimento * largura
+                                    st.success(f"📐 Área calculada: **{area_calculada:.4f} {unidade_med}²**")
+                                    
+                                    # Recalcular custo com base na área
+                                    qtd_real_unidades = area_calculada
+                                    valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                    st.metric("💰 Custo por m²", f"R$ {valor_unitario_real:.4f}")
+                            
+                            # Botão para cadastrar como material
+                            col_btn = st.columns(1)[0]
+                            with col_btn:
                                 if st.button(f"➕ Cadastrar como Material", key=f"btn_mat_manual_{idx}", use_container_width=True):
                                     try:
                                         # Buscar materiais existentes para verificar similaridade
