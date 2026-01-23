@@ -1864,7 +1864,7 @@ def main():
             st.markdown("### 📄 Importar Documento Fiscal XML")
             
             # Sub-tabs para NF-e e Cupom
-            subtab1, subtab2 = st.tabs(["📄 NF-e (Nota Fiscal)", "🧾 Cupom Fiscal (NFC-e)"])
+            subtab1, subtab2, subtab3 = st.tabs(["📄 NF-e (Nota Fiscal)", "🧾 Cupom Fiscal (NFC-e)", "📸 Escanear Cupom"])
             
             with subtab1:
                 st.info("💡 **NF-e:** Nota Fiscal Eletrônica completa. Geralmente usada em compras de fornecedores.")
@@ -2394,6 +2394,172 @@ def main():
                             st.error(dados['mensagem'])
                     except Exception as e:
                         st.error(f"❌ Erro ao processar cupom: {str(e)}")
+            
+            with subtab3:
+                st.markdown("### 📸 Escanear Cupom Fiscal")
+                st.info("💡 **Tire uma foto ou faça upload da imagem do cupom** - a IA vai extrair automaticamente os produtos, quantidades e valores!")
+                
+                # Upload de imagem
+                uploaded_image = st.file_uploader(
+                    "Escolha a imagem do cupom",
+                    type=['png', 'jpg', 'jpeg', 'heic'],
+                    help="Tire uma foto clara do cupom ou faça upload de uma imagem",
+                    key="upload_cupom_img"
+                )
+                
+                if uploaded_image:
+                    # Mostrar preview da imagem
+                    col_img, col_info = st.columns([1, 1])
+                    
+                    with col_img:
+                        st.image(uploaded_image, caption="Cupom carregado", use_column_width=True)
+                    
+                    with col_info:
+                        st.markdown("#### 🤖 Processamento com IA")
+                        st.write("A IA do Google Gemini vai analisar a imagem e extrair:")
+                        st.write("✅ Nome dos produtos")
+                        st.write("✅ Quantidades")
+                        st.write("✅ Valores unitários")
+                        st.write("✅ Valores totais")
+                        st.write("✅ Data e valor total da compra")
+                    
+                    if st.button("🚀 Processar com IA", type="primary", use_container_width=True, key="btn_processar_img"):
+                        try:
+                            import google.generativeai as genai
+                            from PIL import Image
+                            import io
+                            
+                            # Configurar API do Gemini
+                            if 'GEMINI_API_KEY' in st.secrets:
+                                genai.configure(api_key=st.secrets['GEMINI_API_KEY'])
+                            else:
+                                st.error("⚠️ API Key do Gemini não configurada! Adicione no arquivo .streamlit/secrets.toml")
+                                st.stop()
+                            
+                            with st.spinner("🤖 IA analisando a imagem..."):
+                                # Carregar imagem
+                                image = Image.open(uploaded_image)
+                                
+                                # Preparar prompt para o Gemini
+                                prompt = """
+Analise esta imagem de cupom fiscal e extraia as seguintes informações em formato JSON:
+
+{
+  "data": "DD/MM/AAAA",
+  "fornecedor": "Nome do estabelecimento",
+  "valor_total": 999.99,
+  "itens": [
+    {
+      "nome": "Nome do produto",
+      "quantidade": 1.0,
+      "valor_unitario": 99.99,
+      "valor_total": 99.99
+    }
+  ]
+}
+
+IMPORTANTE:
+- Extraia TODOS os produtos do cupom
+- Valores em formato numérico (use ponto decimal)
+- Data no formato DD/MM/AAAA
+- Se houver desconto, calcule o valor unitário já com desconto
+- Retorne APENAS o JSON, sem texto adicional
+"""
+                                
+                                # Usar Gemini Vision
+                                model = genai.GenerativeModel('gemini-1.5-flash')
+                                response = model.generate_content([prompt, image])
+                                
+                                # Extrair JSON da resposta
+                                import json
+                                import re
+                                
+                                # Tentar extrair JSON da resposta
+                                response_text = response.text
+                                
+                                # Remover markdown code blocks se existirem
+                                response_text = re.sub(r'```json\n?', '', response_text)
+                                response_text = re.sub(r'```\n?', '', response_text)
+                                response_text = response_text.strip()
+                                
+                                dados_cupom = json.loads(response_text)
+                                
+                                # Guardar no session state
+                                st.session_state.dados_cupom_ia = dados_cupom
+                                st.success("✅ Cupom processado com sucesso!")
+                                st.rerun()
+                        
+                        except Exception as e:
+                            st.error(f"❌ Erro ao processar imagem: {str(e)}")
+                            st.exception(e)
+                
+                # Mostrar dados extraídos se existirem
+                if 'dados_cupom_ia' in st.session_state:
+                    dados = st.session_state.dados_cupom_ia
+                    
+                    st.markdown("---")
+                    st.markdown("### 📋 Dados Extraídos")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("📅 Data", dados.get('data', '-'))
+                    with col2:
+                        st.metric("🏪 Fornecedor", dados.get('fornecedor', '-'))
+                    with col3:
+                        st.metric("💰 Valor Total", f"R$ {dados.get('valor_total', 0):,.2f}")
+                    
+                    st.markdown("#### 🛒 Produtos")
+                    
+                    if dados.get('itens'):
+                        import pandas as pd
+                        df_itens = pd.DataFrame(dados['itens'])
+                        df_itens['Quantidade'] = df_itens['quantidade'].apply(lambda x: f"{x:.2f}")
+                        df_itens['Valor Unit.'] = df_itens['valor_unitario'].apply(lambda x: f"R$ {x:.2f}")
+                        df_itens['Valor Total'] = df_itens['valor_total'].apply(lambda x: f"R$ {x:.2f}")
+                        df_itens = df_itens[['nome', 'Quantidade', 'Valor Unit.', 'Valor Total']]
+                        df_itens.columns = ['Produto', 'Quantidade', 'Valor Unit.', 'Valor Total']
+                        
+                        st.dataframe(df_itens, use_container_width=True, hide_index=True)
+                        
+                        st.markdown("---")
+                        st.markdown("### 💳 Forma de Pagamento")
+                        
+                        num_parcelas = st.selectbox(
+                            "Número de Parcelas",
+                            options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                            format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                            key="parcelas_cupom_ia"
+                        )
+                        
+                        if num_parcelas > 1:
+                            st.info(f"💰 Valor de cada parcela: R$ {dados['valor_total']/num_parcelas:,.2f}")
+                        
+                        if st.button("✅ Confirmar e Registrar Compra", type="primary", use_container_width=True, key="btn_confirmar_ia"):
+                            try:
+                                descricao = f"Cupom Fiscal - {dados.get('fornecedor', 'Compra')}"
+                                inserir_compra_com_itens(supabase, dados['valor_total'], descricao, dados['itens'], 
+                                                        datetime.strptime(dados.get('data', datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y'), 
+                                                        num_parcelas, "")
+                                
+                                st.success("✅ Compra registrada com sucesso!")
+                                st.balloons()
+                                
+                                # Guardar itens para conversão em materiais
+                                st.session_state.itens_importados_cupom = dados['itens']
+                                st.session_state.fornecedor_cupom = dados.get('fornecedor', 'Cupom Fiscal')
+                                
+                                # Limpar dados do cupom IA
+                                del st.session_state.dados_cupom_ia
+                                
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Erro ao registrar: {str(e)}")
+                    else:
+                        st.warning("Nenhum item foi extraído do cupom.")
+                    
+                    if st.button("🔄 Processar Outro Cupom", key="btn_limpar_ia"):
+                        del st.session_state.dados_cupom_ia
+                        st.rerun()
         
         with tab3:
             st.markdown("### 🔑 Buscar e Importar NF-e")
