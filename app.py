@@ -3366,6 +3366,13 @@ def main():
                         material_selecionado = materiais_dict[material_nome]
                         unidade = material_selecionado['unidade_medida']
                         
+                        # Mostrar custo do material selecionado
+                        col_m1, col_m2 = st.columns(2)
+                        with col_m1:
+                            st.metric("💰 Custo Unitário", f"R$ {float(material_selecionado['custo_unitario']):.4f}/{unidade}")
+                        with col_m2:
+                            st.metric("📦 Estoque", f"{float(material_selecionado['estoque_atual']):.4f} {unidade}")
+                        
                         # Verificar se o nome do material indica quantidade na embalagem (ex: "50 Ponteira...")
                         import re
                         nome_material = material_selecionado['nome']
