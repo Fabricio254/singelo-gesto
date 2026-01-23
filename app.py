@@ -8,6 +8,7 @@ import requests
 import re
 
 # ==================== CONFIGURAÇÕES ====================
+# Versão: 1.2.4 - Fix para variáveis em cálculo de área
 # Configurações do Supabase
 # Em produção (Streamlit Cloud), usa secrets
 # Em desenvolvimento local, usa as variáveis diretas
@@ -2042,6 +2043,7 @@ def main():
                                                     key=f"larg_{idx}"
                                                 )
                                             
+                                            # Calcular área e custo (sempre define as variáveis)
                                             if comprimento > 0 and largura > 0:
                                                 qtd_real_unidades = comprimento * largura
                                                 st.success(f"📐 Área calculada: **{qtd_real_unidades:.6f} {unidade_med}²**")
