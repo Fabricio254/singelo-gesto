@@ -2429,11 +2429,20 @@ def main():
                             from PIL import Image
                             import io
                             
+                            # DEBUG: Mostrar o que tem no secrets
+                            st.write("🔍 Debug - Secrets disponíveis:", list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else "Nenhum")
+                            
                             # Configurar API do Gemini
-                            if 'GEMINI_API_KEY' in st.secrets:
+                            if hasattr(st.secrets, 'GEMINI_API_KEY'):
+                                genai.configure(api_key=st.secrets.GEMINI_API_KEY)
+                                st.success("✅ API Key encontrada!")
+                            elif 'GEMINI_API_KEY' in st.secrets:
                                 genai.configure(api_key=st.secrets['GEMINI_API_KEY'])
+                                st.success("✅ API Key encontrada!")
                             else:
-                                st.error("⚠️ API Key do Gemini não configurada! Adicione no arquivo .streamlit/secrets.toml")
+                                st.error("⚠️ API Key do Gemini não configurada!")
+                                st.info(f"📁 Arquivo esperado: Z:/codigos/Singelo/.streamlit/secrets.toml")
+                                st.code('GEMINI_API_KEY = "AIza...sua-chave"')
                                 st.stop()
                             
                             with st.spinner("🤖 IA analisando a imagem..."):
