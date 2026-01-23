@@ -3104,11 +3104,47 @@ def main():
                             estoque_inicial = st.number_input("Estoque Inicial", min_value=0.0, step=1.0, value=0.0)
                             fornecedor = st.text_input("Fornecedor Principal", placeholder="Nome do fornecedor")
                         
+                        # Se for metro/centímetro/rolo, mostrar campos de área
+                        comprimento_val = 0.0
+                        largura_val = 0.0
+                        if unidade in ['metro', 'centímetro', 'rolo']:
+                            st.markdown("---")
+                            st.info(f"💡 Para materiais em **{unidade}**, você pode informar as dimensões totais (comprimento × largura)")
+                            
+                            col_dim1, col_dim2 = st.columns(2)
+                            with col_dim1:
+                                comprimento_val = st.number_input(
+                                    f"Comprimento ({unidade})",
+                                    min_value=0.0,
+                                    step=0.01,
+                                    format="%.4f",
+                                    help="Ex: 2.00 para 2 metros ou 200 para 200cm",
+                                    key="comp_cadastro"
+                                )
+                            with col_dim2:
+                                largura_val = st.number_input(
+                                    f"Largura ({unidade})",
+                                    min_value=0.0,
+                                    step=0.01,
+                                    format="%.4f",
+                                    help="Ex: 0.30 para 30cm ou 30 para 30cm",
+                                    key="larg_cadastro"
+                                )
+                            
+                            if comprimento_val > 0 and largura_val > 0:
+                                area_total = comprimento_val * largura_val
+                                st.success(f"📐 Área total: **{area_total:.4f} {unidade}²**")
+                                st.caption(f"O estoque inicial será {area_total:.4f} {unidade}² (ao invés de {estoque_inicial:.2f})")
+                        
                         observacoes_mat = st.text_area("Observações", placeholder="Informações adicionais...")
                         
                         submitted = st.form_submit_button("💾 Salvar Material", use_container_width=True)
                         
                         if submitted:
+                            # Se tiver área calculada, usar ela como estoque inicial
+                            if unidade in ['metro', 'centímetro', 'rolo'] and comprimento_val > 0 and largura_val > 0:
+                                estoque_inicial = comprimento_val * largura_val
+                            
                             if nome_material and custo_unitario > 0:
                                 try:
                                     material_data = {
