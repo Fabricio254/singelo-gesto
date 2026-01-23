@@ -2002,24 +2002,6 @@ def main():
                                             
                                             st.metric("Qtd Comprada (NF-e)", f"{qtd_comprada:.0f}")
                                             st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
-                                            
-                                            # Campo editável: Quantidade REAL de unidades
-                                            qtd_sugerida = qtd_comprada * qtd_embalagem if qtd_embalagem > 1 else qtd_comprada
-                                            
-                                            qtd_real_unidades = st.number_input(
-                                                "📦 Quantidade REAL de unidades",
-                                                min_value=1.0,
-                                                value=float(qtd_sugerida),
-                                                step=1.0,
-                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
-                                                key=f"qtd_real_{idx}"
-                                            )
-                                            
-                                            # Calcular custo unitário com base na quantidade informada
-                                            valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
-                                            
-                                            st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
-                                            st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                                         
                                         with col3:
                                             # Detectar unidade automaticamente
@@ -2047,7 +2029,7 @@ def main():
                                                     min_value=0.0,
                                                     step=0.01,
                                                     format="%.4f",
-                                                    help="Ex: 30 para 30 metros ou 0.30 para 30cm",
+                                                    help="Ex: 0.30 para 30cm, 2.00 para 2m",
                                                     key=f"comp_{idx}"
                                                 )
                                             with col_calc2:
@@ -2056,18 +2038,38 @@ def main():
                                                     min_value=0.0,
                                                     step=0.01,
                                                     format="%.4f",
-                                                    help="Ex: 2 para 2 metros ou 0.02 para 2cm",
+                                                    help="Ex: 0.02 para 2cm, 2.00 para 2m",
                                                     key=f"larg_{idx}"
                                                 )
                                             
                                             if comprimento > 0 and largura > 0:
-                                                area_calculada = comprimento * largura
-                                                st.success(f"📐 Área calculada: **{area_calculada:.6f} {unidade_med}²**")
-                                                
-                                                # Recalcular custo com base na área
-                                                qtd_real_unidades = area_calculada
+                                                qtd_real_unidades = comprimento * largura
+                                                st.success(f"📐 Área calculada: **{qtd_real_unidades:.6f} {unidade_med}²**")
                                                 valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
                                                 st.metric("💰 Custo por m²", f"R$ {valor_unitario_real:.4f}")
+                                                st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.6f} m² = R$ {valor_unitario_real:.4f}/m²")
+                                            else:
+                                                qtd_real_unidades = 1.0
+                                                valor_unitario_real = valor_total_item
+                                                st.warning("⚠️ Preencha comprimento e largura para calcular")
+                                        else:
+                                            # Campo editável: Quantidade REAL de unidades (para outras unidades)
+                                            qtd_sugerida = qtd_comprada * qtd_embalagem if qtd_embalagem > 1 else qtd_comprada
+                                            
+                                            qtd_real_unidades = st.number_input(
+                                                "📦 Quantidade REAL de unidades",
+                                                min_value=1.0,
+                                                value=float(qtd_sugerida),
+                                                step=1.0,
+                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                                key=f"qtd_real_{idx}"
+                                            )
+                                            
+                                            # Calcular custo unitário com base na quantidade informada
+                                            valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                            
+                                            st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
+                                            st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                                         
                                         # Botão para cadastrar como material
                                         col_btn = st.columns(1)[0]
@@ -2240,24 +2242,6 @@ def main():
                                             
                                             st.metric("Qtd Comprada (Cupom)", f"{qtd_comprada:.0f}")
                                             st.metric("Valor Total", f"R$ {valor_total_item:.2f}")
-                                            
-                                            # Campo editável: Quantidade REAL de unidades
-                                            qtd_sugerida = qtd_comprada * qtd_embalagem if qtd_embalagem > 1 else qtd_comprada
-                                            
-                                            qtd_real_unidades = st.number_input(
-                                                "📦 Quantidade REAL de unidades",
-                                                min_value=1.0,
-                                                value=float(qtd_sugerida),
-                                                step=1.0,
-                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
-                                                key=f"qtd_real_cupom_{idx}"
-                                            )
-                                            
-                                            # Calcular custo unitário com base na quantidade informada
-                                            valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
-                                            
-                                            st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
-                                            st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                                         
                                         with col3:
                                             # Detectar unidade automaticamente
@@ -2285,7 +2269,7 @@ def main():
                                                     min_value=0.0,
                                                     step=0.01,
                                                     format="%.4f",
-                                                    help="Ex: 30 para 30 metros ou 0.30 para 30cm",
+                                                    help="Ex: 0.30 para 30cm, 2.00 para 2m",
                                                     key=f"comp_cupom_{idx}"
                                                 )
                                             with col_calc2:
@@ -2294,18 +2278,38 @@ def main():
                                                     min_value=0.0,
                                                     step=0.01,
                                                     format="%.4f",
-                                                    help="Ex: 2 para 2 metros ou 0.02 para 2cm",
+                                                    help="Ex: 0.02 para 2cm, 2.00 para 2m",
                                                     key=f"larg_cupom_{idx}"
                                                 )
                                             
                                             if comprimento_cupom > 0 and largura_cupom > 0:
-                                                area_calculada_cupom = comprimento_cupom * largura_cupom
-                                                st.success(f"📐 Área calculada: **{area_calculada_cupom:.6f} {unidade_med}²**")
-                                                
-                                                # Recalcular custo com base na área
-                                                qtd_real_unidades = area_calculada_cupom
+                                                qtd_real_unidades = comprimento_cupom * largura_cupom
+                                                st.success(f"📐 Área calculada: **{qtd_real_unidades:.6f} {unidade_med}²**")
                                                 valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
                                                 st.metric("💰 Custo por m²", f"R$ {valor_unitario_real:.4f}")
+                                                st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.6f} m² = R$ {valor_unitario_real:.4f}/m²")
+                                            else:
+                                                qtd_real_unidades = 1.0
+                                                valor_unitario_real = valor_total_item
+                                                st.warning("⚠️ Preencha comprimento e largura para calcular")
+                                        else:
+                                            # Campo editável: Quantidade REAL de unidades (para outras unidades)
+                                            qtd_sugerida = qtd_comprada * qtd_embalagem if qtd_embalagem > 1 else qtd_comprada
+                                            
+                                            qtd_real_unidades = st.number_input(
+                                                "📦 Quantidade REAL de unidades",
+                                                min_value=1.0,
+                                                value=float(qtd_sugerida),
+                                                step=1.0,
+                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                                key=f"qtd_real_cupom_{idx}"
+                                            )
+                                            
+                                            # Calcular custo unitário com base na quantidade informada
+                                            valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                            
+                                            st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
+                                            st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                                         
                                         # Botão para cadastrar como material
                                         col_btn = st.columns(1)[0]
