@@ -2088,24 +2088,24 @@ def main():
                                                             "custo_unitario": valor_unitario_real,
                                                             "ultima_compra_data": datetime.now().date().isoformat(),
                                                             "fornecedor_principal": st.session_state.fornecedor_nfe,
-                                                            "estoque_atual": qtd_total_unidades,  # Adicionar ao estoque
+                                                            "estoque_atual": qtd_real_unidades,  # Adicionar ao estoque
                                                             "updated_at": datetime.now().isoformat()
                                                         }).eq("id", material_id).execute()
                                                         
                                                         st.success(f"✅ Material atualizado! Custo: R$ {custo_antigo:.4f} → R$ {valor_unitario_real:.4f}")
                                                     else:
                                                         # Cadastrar novo - usar descrição original da NF-e
-                                                        nome_original = item.get('nome', '')
-                                                        descricao_original = item.get('descricao', '') or nome_original
+                                                        nome_original_item = item.get('nome', '')
+                                                        descricao_original = item.get('descricao', '') or nome_original_item
                                                         material_data = {
                                                             "nome": nome_material,
                                                             "descricao": descricao_original,
                                                             "unidade_medida": unidade_med,
-                                                            "estoque_atual": qtd_total_unidades,
+                                                            "estoque_atual": qtd_real_unidades,
                                                             "custo_unitario": valor_unitario_real,
                                                             "ultima_compra_data": datetime.now().date().isoformat(),
                                                             "fornecedor_principal": st.session_state.fornecedor_nfe,
-                                                            "observacoes": f"Importado de NF-e - {qtd_embalagem_edit} unidades por embalagem"
+                                                            "observacoes": f"Importado de NF-e - {qtd_embalagem} unidades por embalagem"
                                                         }
                                                         supabase.table("singelo_materiais").insert(material_data).execute()
                                                         st.success(f"✅ Material '{nome_material}' cadastrado com sucesso!")
