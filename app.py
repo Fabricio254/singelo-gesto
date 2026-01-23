@@ -2034,8 +2034,44 @@ def main():
                                                 key=f"unid_{idx}",
                                                 help=f"✨ Detectado: {unidade_detectada}"
                                             )
+                                        
+                                        # Se for metro/centímetro/rolo, mostrar campos de área
+                                        if unidade_med in ['metro', 'centímetro', 'rolo']:
+                                            st.markdown("---")
+                                            st.info(f"💡 Para materiais em **{unidade_med}**, calcule por área (comprimento × largura)")
                                             
-                                            # Botão para cadastrar como material
+                                            col_calc1, col_calc2 = st.columns(2)
+                                            with col_calc1:
+                                                comprimento = st.number_input(
+                                                    f"Comprimento ({unidade_med})",
+                                                    min_value=0.0,
+                                                    step=0.01,
+                                                    format="%.4f",
+                                                    help="Ex: 30 para 30 metros ou 0.30 para 30cm",
+                                                    key=f"comp_{idx}"
+                                                )
+                                            with col_calc2:
+                                                largura = st.number_input(
+                                                    f"Largura ({unidade_med})",
+                                                    min_value=0.0,
+                                                    step=0.01,
+                                                    format="%.4f",
+                                                    help="Ex: 2 para 2 metros ou 0.02 para 2cm",
+                                                    key=f"larg_{idx}"
+                                                )
+                                            
+                                            if comprimento > 0 and largura > 0:
+                                                area_calculada = comprimento * largura
+                                                st.success(f"📐 Área calculada: **{area_calculada:.6f} {unidade_med}²**")
+                                                
+                                                # Recalcular custo com base na área
+                                                qtd_real_unidades = area_calculada
+                                                valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                                st.metric("💰 Custo por m²", f"R$ {valor_unitario_real:.4f}")
+                                        
+                                        # Botão para cadastrar como material
+                                        col_btn = st.columns(1)[0]
+                                        with col_btn:
                                             if st.button(f"➕ Cadastrar como Material", key=f"btn_mat_{idx}", use_container_width=True):
                                                 try:
                                                     # Verificar se já existe
@@ -2236,8 +2272,44 @@ def main():
                                                 key=f"unid_cupom_{idx}",
                                                 help=f"✨ Detectado: {unidade_detectada}"
                                             )
+                                        
+                                        # Se for metro/centímetro/rolo, mostrar campos de área
+                                        if unidade_med in ['metro', 'centímetro', 'rolo']:
+                                            st.markdown("---")
+                                            st.info(f"💡 Para materiais em **{unidade_med}**, calcule por área (comprimento × largura)")
                                             
-                                            # Botão para cadastrar como material
+                                            col_calc1, col_calc2 = st.columns(2)
+                                            with col_calc1:
+                                                comprimento_cupom = st.number_input(
+                                                    f"Comprimento ({unidade_med})",
+                                                    min_value=0.0,
+                                                    step=0.01,
+                                                    format="%.4f",
+                                                    help="Ex: 30 para 30 metros ou 0.30 para 30cm",
+                                                    key=f"comp_cupom_{idx}"
+                                                )
+                                            with col_calc2:
+                                                largura_cupom = st.number_input(
+                                                    f"Largura ({unidade_med})",
+                                                    min_value=0.0,
+                                                    step=0.01,
+                                                    format="%.4f",
+                                                    help="Ex: 2 para 2 metros ou 0.02 para 2cm",
+                                                    key=f"larg_cupom_{idx}"
+                                                )
+                                            
+                                            if comprimento_cupom > 0 and largura_cupom > 0:
+                                                area_calculada_cupom = comprimento_cupom * largura_cupom
+                                                st.success(f"📐 Área calculada: **{area_calculada_cupom:.6f} {unidade_med}²**")
+                                                
+                                                # Recalcular custo com base na área
+                                                qtd_real_unidades = area_calculada_cupom
+                                                valor_unitario_real = valor_total_item / qtd_real_unidades if qtd_real_unidades > 0 else 0
+                                                st.metric("💰 Custo por m²", f"R$ {valor_unitario_real:.4f}")
+                                        
+                                        # Botão para cadastrar como material
+                                        col_btn = st.columns(1)[0]
+                                        with col_btn:
                                             if st.button(f"➕ Cadastrar como Material", key=f"btn_mat_cupom_{idx}", use_container_width=True):
                                                 try:
                                                     # Verificar se já existe
@@ -2252,24 +2324,24 @@ def main():
                                                             "custo_unitario": valor_unitario_real,
                                                             "ultima_compra_data": datetime.now().date().isoformat(),
                                                             "fornecedor_principal": st.session_state.fornecedor_cupom,
-                                                            "estoque_atual": qtd_total_unidades,
+                                                            "estoque_atual": qtd_real_unidades,
                                                             "updated_at": datetime.now().isoformat()
                                                         }).eq("id", material_id).execute()
                                                         
                                                         st.success(f"✅ Material atualizado! Custo: R$ {custo_antigo:.4f} → R$ {valor_unitario_real:.4f}")
                                                     else:
                                                         # Cadastrar novo - usar descrição original do Cupom
-                                                        nome_original = item.get('nome', '')
-                                                        descricao_original = item.get('descricao', '') or nome_original
+                                                        nome_original_item = item.get('nome', '')
+                                                        descricao_original = item.get('descricao', '') or nome_original_item
                                                         material_data = {
                                                             "nome": nome_material,
                                                             "descricao": descricao_original,
                                                             "unidade_medida": unidade_med,
-                                                            "estoque_atual": qtd_total_unidades,
+                                                            "estoque_atual": qtd_real_unidades,
                                                             "custo_unitario": valor_unitario_real,
                                                             "ultima_compra_data": datetime.now().date().isoformat(),
                                                             "fornecedor_principal": st.session_state.fornecedor_cupom,
-                                                            "observacoes": f"Importado de Cupom Fiscal - {qtd_embalagem_edit} unidades por embalagem"
+                                                            "observacoes": f"Importado de Cupom Fiscal - {qtd_embalagem} unidades por embalagem"
                                                         }
                                                         supabase.table("singelo_materiais").insert(material_data).execute()
                                                         st.success(f"✅ Material '{nome_material}' cadastrado com sucesso!")
