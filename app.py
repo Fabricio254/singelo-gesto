@@ -2425,29 +2425,31 @@ def main():
                     
                     if st.button("🚀 Processar com IA", type="primary", use_container_width=True, key="btn_processar_img"):
                         try:
-                            import google.generativeai as genai
                             from PIL import Image
                             import io
+                            import requests
+                            import json
+                            import base64
                             
-                            # DEBUG: Mostrar o que tem no secrets
-                            st.write("🔍 Debug - Secrets disponíveis:", list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else "Nenhum")
-                            
-                            # Configurar API do Gemini
-                            if hasattr(st.secrets, 'GEMINI_API_KEY'):
-                                genai.configure(api_key=st.secrets.GEMINI_API_KEY)
-                                st.success("✅ API Key encontrada!")
-                            elif 'GEMINI_API_KEY' in st.secrets:
-                                genai.configure(api_key=st.secrets['GEMINI_API_KEY'])
-                                st.success("✅ API Key encontrada!")
-                            else:
+                            # Verificar API do Gemini
+                            if not ('GEMINI_API_KEY' in st.secrets or hasattr(st.secrets, 'GEMINI_API_KEY')):
                                 st.error("⚠️ API Key do Gemini não configurada!")
                                 st.info(f"📁 Arquivo esperado: Z:/codigos/Singelo/.streamlit/secrets.toml")
                                 st.code('GEMINI_API_KEY = "AIza...sua-chave"')
                                 st.stop()
                             
                             with st.spinner("🤖 IA analisando a imagem..."):
-                                # Carregar imagem
+                                import requests
+                                import json
+                                import re
+                                import base64
+                                from io import BytesIO
+                                
+                                # Carregar e converter imagem para base64
                                 image = Image.open(uploaded_image)
+                                buffered = BytesIO()
+                                image.save(buffered, format="JPEG")
+                                image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
                                 
                                 # Preparar prompt para o Gemini
                                 prompt = """
@@ -2475,16 +2477,29 @@ IMPORTANTE:
 - Retorne APENAS o JSON, sem texto adicional
 """
                                 
-                                # Usar Gemini Vision
-                                model = genai.GenerativeModel('gemini-1.5-flash')
-                                response = model.generate_content([prompt, image])
+                                # Chamar API REST do Gemini
+                                api_key = st.secrets.get('GEMINI_API_KEY') or st.secrets.GEMINI_API_KEY
+                                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
                                 
-                                # Extrair JSON da resposta
-                                import json
-                                import re
+                                payload = {
+                                    "contents": [{
+                                        "parts": [
+                                            {"text": prompt},
+                                            {
+                                                "inline_data": {
+                                                    "mime_type": "image/jpeg",
+                                                    "data": image_base64
+                                                }
+                                            }
+                                        ]
+                                    }]
+                                }
                                 
-                                # Tentar extrair JSON da resposta
-                                response_text = response.text
+                                response = requests.post(url, json=payload)
+                                response.raise_for_status()
+                                
+                                result = response.json()
+                                response_text = result['candidates'][0]['content']['parts'][0]['text']
                                 
                                 # Remover markdown code blocks se existirem
                                 response_text = re.sub(r'```json\n?', '', response_text)
