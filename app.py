@@ -4202,7 +4202,7 @@ FOR ALL USING (true) WITH CHECK (true);
                     
                     st.markdown("---")
                 
-                # Modal de edição de compra
+                # Modal de edição de compra (fora do loop)
                 if 'editando_compra' in st.session_state and st.session_state.editando_compra:
                     compra = st.session_state.editando_compra
                     data_compra_obj = datetime.fromisoformat(compra['data'].replace('Z', '+00:00'))
@@ -4211,59 +4211,62 @@ FOR ALL USING (true) WITH CHECK (true);
                     parcelas_atuais = supabase.table("singelo_parcelas_compras").select("*").eq("compra_id", compra['id']).execute()
                     num_parcelas_atual = len(parcelas_atuais.data) if parcelas_atuais.data else 1
                     
-                    with st.form(f"form_edit_compra_{compra['id']}"):
-                        st.markdown(f"### ✏️ Editar Compra")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            novo_valor = st.number_input(
-                                "💵 Valor Total (R$)",
-                                min_value=0.01,
-                                value=float(compra['valor_total']),
-                                step=0.01,
-                                format="%.2f"
-                            )
-                        
-                        with col2:
-                            novo_num_parcelas = st.selectbox(
-                                "💳 Número de Parcelas",
-                                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-                                index=num_parcelas_atual - 1 if num_parcelas_atual <= 12 else 0,
-                                format_func=lambda x: f"{x}x" if x > 1 else "À vista"
-                            )
-                        
-                        nova_descricao = st.text_area(
-                            "📝 Descrição",
-                            value=compra.get('descricao', ''),
-                            height=100
+                    st.markdown("---")
+                    st.markdown(f"### ✏️ Editar Compra - {data_compra_obj.strftime('%d/%m/%Y %H:%M')}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        novo_valor = st.number_input(
+                            "💵 Valor Total (R$)",
+                            min_value=0.01,
+                            value=float(compra['valor_total']),
+                            step=0.01,
+                            format="%.2f",
+                            key="edit_valor_compra"
                         )
-                        
-                        # Aviso se mudar número de parcelas
-                        if novo_num_parcelas != num_parcelas_atual:
-                            st.warning(f"⚠️ **ATENÇÃO:** Você está alterando o número de parcelas de {num_parcelas_atual}x para {novo_num_parcelas}x. Todas as parcelas já lançadas serão recalculadas!")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.form_submit_button("💾 Salvar", use_container_width=True, type="primary"):
-                                try:
-                                    # Atualizar compra
-                                    atualizar_compra(supabase, compra['id'], novo_valor, nova_descricao)
-                                    
-                                    # Se mudou o número de parcelas, recalcular
-                                    if novo_num_parcelas != num_parcelas_atual:
-                                        recalcular_parcelas(supabase, compra['id'], novo_valor, novo_num_parcelas, data_compra_obj)
-                                        st.success(f"✅ Compra atualizada e {novo_num_parcelas} parcelas recalculadas!")
-                                    else:
-                                        st.success("✅ Compra atualizada!")
-                                    
-                                    del st.session_state.editando_compra
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"❌ Erro: {str(e)}")
-                        with col2:
-                            if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                    
+                    with col2:
+                        novo_num_parcelas = st.selectbox(
+                            "💳 Número de Parcelas",
+                            options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                            index=num_parcelas_atual - 1 if num_parcelas_atual <= 12 else 0,
+                            format_func=lambda x: f"{x}x" if x > 1 else "À vista",
+                            key="edit_parcelas_compra"
+                        )
+                    
+                    nova_descricao = st.text_area(
+                        "📝 Descrição",
+                        value=compra.get('descricao', ''),
+                        height=100,
+                        key="edit_desc_compra"
+                    )
+                    
+                    # Aviso se mudar número de parcelas
+                    if novo_num_parcelas != num_parcelas_atual:
+                        st.warning(f"⚠️ **ATENÇÃO:** Você está alterando o número de parcelas de {num_parcelas_atual}x para {novo_num_parcelas}x. Todas as parcelas já lançadas serão recalculadas!")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("💾 Salvar Alterações", use_container_width=True, type="primary", key="btn_salvar_compra"):
+                            try:
+                                # Atualizar compra
+                                atualizar_compra(supabase, compra['id'], novo_valor, nova_descricao)
+                                
+                                # Se mudou o número de parcelas, recalcular
+                                if novo_num_parcelas != num_parcelas_atual:
+                                    recalcular_parcelas(supabase, compra['id'], novo_valor, novo_num_parcelas, data_compra_obj)
+                                    st.success(f"✅ Compra atualizada e {novo_num_parcelas} parcelas recalculadas!")
+                                else:
+                                    st.success("✅ Compra atualizada!")
+                                
                                 del st.session_state.editando_compra
                                 st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Erro: {str(e)}")
+                    with col2:
+                        if st.button("❌ Cancelar", use_container_width=True, key="btn_cancelar_compra"):
+                            del st.session_state.editando_compra
+                            st.rerun()
             else:
                 st.info("📭 Nenhuma compra registrada ainda")
         
@@ -4314,93 +4317,97 @@ FOR ALL USING (true) WITH CHECK (true);
                     
                     st.markdown("---")
                 
-                # Modal de edição de venda
+                # Modal de edição de venda (fora do loop)
                 if 'editando_venda' in st.session_state and st.session_state.editando_venda:
                     venda = st.session_state.editando_venda
                     
-                    with st.form(f"form_edit_venda_{venda['id']}"):
-                        st.markdown(f"### ✏️ Editar Venda")
-                        
-                        st.markdown("#### 📦 Informações do Produto")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            novo_produto = st.selectbox("🎁 Box", options=BOXES, index=BOXES.index(venda['produto']) if venda['produto'] in BOXES else 0)
-                        with col2:
-                            novo_tamanho = st.selectbox("📏 Tamanho", options=list(TAMANHOS.keys()), 
-                                                       index=list(TAMANHOS.keys()).index(venda.get('tamanho', 'Box mini')) if venda.get('tamanho') in TAMANHOS.keys() else 0)
-                        
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            nova_quantidade = st.number_input("📦 Quantidade", min_value=1, value=venda['quantidade'], step=1)
-                        with col2:
-                            novo_valor = st.number_input("💵 Valor (R$)", min_value=0.01, value=float(venda['valor_total']), step=0.01, format="%.2f")
-                        with col3:
-                            nova_taxa = st.number_input("🚚 Taxa Entrega (R$)", min_value=0.00, value=float(venda.get('taxa_entrega', 0)), step=0.01, format="%.2f")
-                        
-                        st.markdown("---")
-                        st.markdown("#### 📍 Endereço de Entrega")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            # Converter string ISO para date se necessário
-                            data_entrega_atual = None
-                            if venda.get('data_entrega'):
-                                try:
-                                    if isinstance(venda['data_entrega'], str):
-                                        data_entrega_atual = datetime.fromisoformat(venda['data_entrega'].replace('Z', '+00:00')).date()
-                                    else:
-                                        data_entrega_atual = venda['data_entrega']
-                                except:
-                                    data_entrega_atual = datetime.now().date()
-                            else:
+                    st.markdown("---")
+                    st.markdown(f"### ✏️ Editar Venda")
+                    
+                    st.markdown("#### 📦 Informações do Produto")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        novo_produto = st.selectbox("🎁 Box", options=BOXES, 
+                                                   index=BOXES.index(venda['produto']) if venda['produto'] in BOXES else 0,
+                                                   key="edit_produto_venda")
+                    with col2:
+                        novo_tamanho = st.selectbox("📏 Tamanho", options=list(TAMANHOS.keys()), 
+                                                   index=list(TAMANHOS.keys()).index(venda.get('tamanho', 'Box mini')) if venda.get('tamanho') in TAMANHOS.keys() else 0,
+                                                   key="edit_tamanho_venda")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        nova_quantidade = st.number_input("📦 Quantidade", min_value=1, value=venda['quantidade'], step=1, key="edit_qtd_venda")
+                    with col2:
+                        novo_valor = st.number_input("💵 Valor (R$)", min_value=0.01, value=float(venda['valor_total']), step=0.01, format="%.2f", key="edit_valor_venda")
+                    with col3:
+                        nova_taxa = st.number_input("🚚 Taxa Entrega (R$)", min_value=0.00, value=float(venda.get('taxa_entrega', 0)), step=0.01, format="%.2f", key="edit_taxa_venda")
+                    
+                    st.markdown("---")
+                    st.markdown("#### 📍 Endereço de Entrega")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        # Converter string ISO para date se necessário
+                        data_entrega_atual = None
+                        if venda.get('data_entrega'):
+                            try:
+                                if isinstance(venda['data_entrega'], str):
+                                    data_entrega_atual = datetime.fromisoformat(venda['data_entrega'].replace('Z', '+00:00')).date()
+                                else:
+                                    data_entrega_atual = venda['data_entrega']
+                            except:
                                 data_entrega_atual = datetime.now().date()
-                            
-                            nova_data_entrega = st.date_input(
-                                "📅 Data de Entrega",
-                                value=data_entrega_atual,
-                                format="DD/MM/YYYY"
-                            )
-                        with col2:
-                            novo_cep = st.text_input("📮 CEP", value=venda.get('cep', ''), max_chars=9)
+                        else:
+                            data_entrega_atual = datetime.now().date()
                         
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            novo_logradouro = st.text_input("🏠 Rua/Avenida", value=venda.get('logradouro', ''))
-                        with col2:
-                            novo_numero = st.text_input("🔢 Número", value=venda.get('numero', ''))
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            novo_bairro = st.text_input("🏘️ Bairro", value=venda.get('bairro', ''))
-                        with col2:
-                            novo_complemento = st.text_input("🏢 Complemento", value=venda.get('complemento', ''))
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            nova_cidade = st.text_input("🌆 Cidade", value=venda.get('cidade', ''))
-                        with col2:
-                            novo_uf = st.text_input("🗺️ Estado (UF)", value=venda.get('uf', ''), max_chars=2)
-                        
-                        st.markdown("---")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.form_submit_button("💾 Salvar", use_container_width=True, type="primary"):
-                                try:
-                                    atualizar_venda(supabase, venda['id'], novo_produto, nova_quantidade, novo_valor, nova_taxa, novo_tamanho,
-                                                   data_entrega=nova_data_entrega, cep=novo_cep, 
-                                                   logradouro=novo_logradouro, numero=novo_numero,
-                                                   complemento=novo_complemento, bairro=novo_bairro,
-                                                   cidade=nova_cidade, uf=novo_uf)
-                                    st.success("✅ Venda atualizada!")
-                                    del st.session_state.editando_venda
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"❌ Erro: {str(e)}")
-                        with col2:
-                            if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                        nova_data_entrega = st.date_input(
+                            "📅 Data de Entrega",
+                            value=data_entrega_atual,
+                            format="DD/MM/YYYY",
+                            key="edit_data_entrega_venda"
+                        )
+                    with col2:
+                        novo_cep = st.text_input("📮 CEP", value=venda.get('cep', ''), max_chars=9, key="edit_cep_venda")
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        novo_logradouro = st.text_input("🏠 Rua/Avenida", value=venda.get('logradouro', ''), key="edit_logr_venda")
+                    with col2:
+                        novo_numero = st.text_input("🔢 Número", value=venda.get('numero', ''), key="edit_num_venda")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        novo_bairro = st.text_input("🏘️ Bairro", value=venda.get('bairro', ''), key="edit_bairro_venda")
+                    with col2:
+                        novo_complemento = st.text_input("🏢 Complemento", value=venda.get('complemento', ''), key="edit_compl_venda")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        nova_cidade = st.text_input("🌆 Cidade", value=venda.get('cidade', ''), key="edit_cidade_venda")
+                    with col2:
+                        novo_uf = st.text_input("🗺️ Estado (UF)", value=venda.get('uf', ''), max_chars=2, key="edit_uf_venda")
+                    
+                    st.markdown("---")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("💾 Salvar Alterações", use_container_width=True, type="primary", key="btn_salvar_venda"):
+                            try:
+                                atualizar_venda(supabase, venda['id'], novo_produto, nova_quantidade, novo_valor, nova_taxa, novo_tamanho,
+                                               data_entrega=nova_data_entrega, cep=novo_cep, 
+                                               logradouro=novo_logradouro, numero=novo_numero,
+                                               complemento=novo_complemento, bairro=novo_bairro,
+                                               cidade=nova_cidade, uf=novo_uf)
+                                st.success("✅ Venda atualizada!")
                                 del st.session_state.editando_venda
                                 st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Erro: {str(e)}")
+                    with col2:
+                        if st.button("❌ Cancelar", use_container_width=True, key="btn_cancelar_venda"):
+                            del st.session_state.editando_venda
+                            st.rerun()
                 
                 # Resumo por produto
                 st.markdown("#### 📊 Vendas por Produto")
