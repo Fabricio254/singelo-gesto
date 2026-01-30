@@ -1275,13 +1275,17 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-            # Buscar parcelas pendentes do período
+            # Buscar parcelas pendentes do período (EXCLUIR custos automáticos)
             parcelas_periodo = buscar_parcelas_pendentes(supabase, data_inicio_filtro, data_fim_filtro)
-            parcelas_pendentes = [p for p in parcelas_periodo if p['status'] == 'pendente'] if parcelas_periodo else []
+            # Filtrar: apenas parcelas pendentes que NÃO sejam de custo automático
+            parcelas_cartao = [p for p in parcelas_periodo 
+                              if p['status'] == 'pendente' 
+                              and not (p.get('descricao', '').lower().startswith('custo automático') 
+                                      or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo else []
             
-            if parcelas_pendentes:
-                with st.expander(f"📋 Ver {len(parcelas_pendentes)} parcela(s)"):
-                    for parcela in parcelas_pendentes:
+            if parcelas_cartao:
+                with st.expander(f"📋 Ver {len(parcelas_cartao)} parcela(s)"):
+                    for parcela in parcelas_cartao:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
                         
                         # Buscar data de emissão se disponível
@@ -1305,6 +1309,33 @@ def main():
                     <h2>R$ {resumo['total_custos_auto']:,.2f}</h2>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # Buscar parcelas de CUSTOS AUTOMÁTICOS do período
+            parcelas_periodo = buscar_parcelas_pendentes(supabase, data_inicio_filtro, data_fim_filtro)
+            # Filtrar: apenas parcelas pendentes de custo automático
+            parcelas_custos_box = [p for p in parcelas_periodo 
+                                  if p['status'] == 'pendente' 
+                                  and (p.get('descricao', '').lower().startswith('custo automático') 
+                                      or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo else []
+            
+            if parcelas_custos_box:
+                with st.expander(f"📋 Ver {len(parcelas_custos_box)} custo(s)"):
+                    for parcela in parcelas_custos_box:
+                        data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
+                        
+                        # Buscar data de emissão se disponível
+                        data_emissao_str = ""
+                        if parcela.get('singelo_compras') and parcela['singelo_compras'].get('data'):
+                            data_emissao = datetime.fromisoformat(parcela['singelo_compras']['data'].replace('Z', '+00:00'))
+                            data_emissao_str = f"📝 {data_emissao.strftime('%d/%m/%Y')} | "
+                        
+                        st.markdown(f"""
+                        <div style='padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
+                            <small>{data_emissao_str}📅 Venc: {data_venc.strftime('%d/%m/%Y')}</small><br>
+                            <strong>R$ {float(parcela['valor_parcela']):,.2f}</strong> - {parcela['numero_parcela']}/{parcela['total_parcelas']}x<br>
+                            <small>{parcela.get('descricao', '')[:70]}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
         
         with col3:
             st.markdown(f"""
