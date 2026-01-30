@@ -4191,6 +4191,7 @@ FOR ALL USING (true) WITH CHECK (true);
                     with col4:
                         if st.button("✏️", key=f"edit_compra_{compra['id']}", help="Editar", use_container_width=True):
                             st.session_state.editando_compra = compra
+                            st.rerun()
                     with col5:
                         if st.button("🗑️", key=f"del_compra_{compra['id']}", help="Excluir", use_container_width=True):
                             try:
@@ -4306,6 +4307,7 @@ FOR ALL USING (true) WITH CHECK (true);
                     with col6:
                         if st.button("✏️", key=f"edit_venda_{venda['id']}", help="Editar", use_container_width=True):
                             st.session_state.editando_venda = venda
+                            st.rerun()
                     with col7:
                         if st.button("🗑️", key=f"del_venda_{venda['id']}", help="Excluir", use_container_width=True):
                             try:
