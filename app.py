@@ -1310,12 +1310,11 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-            # Buscar parcelas de CUSTOS AUTOMÁTICOS do período
+            # Buscar parcelas de CUSTOS AUTOMÁTICOS do período (pendentes E pagas)
             parcelas_periodo = buscar_parcelas_pendentes(supabase, data_inicio_filtro, data_fim_filtro)
-            # Filtrar: apenas parcelas pendentes de custo automático
+            # Filtrar: parcelas de custo automático (tanto pendentes quanto pagas)
             parcelas_custos_box = [p for p in parcelas_periodo 
-                                  if p['status'] == 'pendente' 
-                                  and (p.get('descricao', '').lower().startswith('custo automático') 
+                                  if (p.get('descricao', '').lower().startswith('custo automático') 
                                       or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo else []
             
             if parcelas_custos_box:
@@ -1323,17 +1322,27 @@ def main():
                     for parcela in parcelas_custos_box:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
                         
+                        # Verificar status da parcela
+                        status_emoji = "✅" if parcela['status'] == 'pago' else "⏰"
+                        status_text = "Pago" if parcela['status'] == 'pago' else "Pendente"
+                        
                         # Buscar data de emissão se disponível
                         data_emissao_str = ""
                         if parcela.get('singelo_compras') and parcela['singelo_compras'].get('data'):
                             data_emissao = datetime.fromisoformat(parcela['singelo_compras']['data'].replace('Z', '+00:00'))
                             data_emissao_str = f"📝 {data_emissao.strftime('%d/%m/%Y')} | "
                         
+                        # Data de pagamento se disponível
+                        data_pag_str = ""
+                        if parcela['status'] == 'pago' and parcela.get('data_pagamento'):
+                            data_pag = datetime.fromisoformat(parcela['data_pagamento'].replace('Z', '+00:00'))
+                            data_pag_str = f"<br><small>💳 Pago: {data_pag.strftime('%d/%m/%Y %H:%M')}</small>"
+                        
                         st.markdown(f"""
-                        <div style='padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-                            <small>{data_emissao_str}📅 Venc: {data_venc.strftime('%d/%m/%Y')}</small><br>
+                        <div style='padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.1); border-radius: 5px; border-left: 3px solid {"#28A745" if parcela["status"] == "pago" else "#F39C12"};'>
+                            <small>{status_emoji} {status_text} | {data_emissao_str}📅 Venc: {data_venc.strftime('%d/%m/%Y')}</small><br>
                             <strong>R$ {float(parcela['valor_parcela']):,.2f}</strong> - {parcela['numero_parcela']}/{parcela['total_parcelas']}x<br>
-                            <small>{parcela.get('descricao', '')[:70]}</small>
+                            <small>{parcela.get('descricao', '')[:70]}</small>{data_pag_str}
                         </div>
                         """, unsafe_allow_html=True)
         
