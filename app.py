@@ -948,7 +948,14 @@ def buscar_entregas(supabase: Client, limite: int = 50):
     return result.data
 
 def excluir_compra(supabase: Client, compra_id: int):
-    """Exclui uma compra do banco"""
+    """Exclui uma compra e todos os registros vinculados (parcelas e itens)"""
+    # Excluir parcelas vinculadas
+    supabase.table("singelo_parcelas_compras").delete().eq("compra_id", compra_id).execute()
+    
+    # Excluir itens vinculados
+    supabase.table("singelo_itens_compras").delete().eq("compra_id", compra_id).execute()
+    
+    # Excluir a compra
     result = supabase.table("singelo_compras").delete().eq("id", compra_id).execute()
     return result
 
