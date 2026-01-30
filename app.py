@@ -832,7 +832,8 @@ def extrair_dados_xml_nfe(xml_content):
 
 def buscar_parcelas_pendentes(supabase: Client, data_inicio=None, data_fim=None):
     """Busca parcelas com vencimento até o final do período (inclui parcelas futuras do mês)"""
-    query = supabase.table("singelo_parcelas_compras").select("*")
+    # Fazer JOIN com singelo_compras para trazer a data de emissão
+    query = supabase.table("singelo_parcelas_compras").select("*, singelo_compras(data)")
     
     if data_inicio:
         query = query.gte("data_vencimento", data_inicio.isoformat())
@@ -3326,6 +3327,11 @@ IMPORTANTE:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
                         dias_para_vencer = (data_venc.date() - datetime.now().date()).days
                         
+                        # Buscar data de emissão da compra
+                        data_emissao = None
+                        if parcela.get('singelo_compras') and parcela['singelo_compras'].get('data'):
+                            data_emissao = datetime.fromisoformat(parcela['singelo_compras']['data'].replace('Z', '+00:00'))
+                        
                         # Determinar cor baseado em dias para vencer (atrasadas já são marcadas como pagas automaticamente)
                         if dias_para_vencer <= 7:
                             cor_status = "🟡 Vence em breve"
@@ -3340,6 +3346,7 @@ IMPORTANTE:
                             st.markdown(f"""
                                 <div class='box-card' style='{estilo_extra}'>
                                     <strong>{cor_status}</strong><br>
+                                    {f"📝 Emissão: {data_emissao.strftime('%d/%m/%Y')}<br>" if data_emissao else ""}
                                     📅 Vencimento: {data_venc.strftime('%d/%m/%Y')}<br>
                                     💵 Valor: R$ {float(parcela['valor_parcela']):,.2f}<br>
                                     📦 Parcela: {parcela['numero_parcela']}/{parcela['total_parcelas']}<br>
@@ -3367,12 +3374,18 @@ IMPORTANTE:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
                         data_pag = datetime.fromisoformat(parcela['data_pagamento'].replace('Z', '+00:00')) if parcela.get('data_pagamento') else None
                         
+                        # Buscar data de emissão da compra
+                        data_emissao = None
+                        if parcela.get('singelo_compras') and parcela['singelo_compras'].get('data'):
+                            data_emissao = datetime.fromisoformat(parcela['singelo_compras']['data'].replace('Z', '+00:00'))
+                        
                         col1, col2 = st.columns([4, 1])
                         
                         with col1:
                             st.markdown(f"""
                                 <div class='box-card' style='border-left: 4px solid #28A745;'>
                                     <strong>✅ Paga</strong><br>
+                                    {f"📝 Emissão: {data_emissao.strftime('%d/%m/%Y')}<br>" if data_emissao else ""}
                                     📅 Vencimento: {data_venc.strftime('%d/%m/%Y')}<br>
                                     💵 Valor: R$ {float(parcela['valor_parcela']):,.2f}<br>
                                     📦 Parcela: {parcela['numero_parcela']}/{parcela['total_parcelas']}<br>
