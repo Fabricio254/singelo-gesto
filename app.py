@@ -697,9 +697,12 @@ def inserir_itens_compra(supabase: Client, compra_id: int, itens: list):
     """Insere os itens individuais de uma compra na tabela de itens"""
     try:
         for item in itens:
+            # Aceitar tanto 'nome' quanto 'produto' como chave
+            nome_produto = item.get('nome', item.get('produto', ''))
+            
             item_data = {
                 "compra_id": compra_id,
-                "nome_produto": item.get('nome', ''),
+                "nome_produto": nome_produto,
                 "descricao": item.get('descricao', ''),
                 "quantidade": float(item.get('quantidade', 0)),
                 "valor_unitario": float(item.get('valor_unitario', 0)),
@@ -2179,6 +2182,9 @@ def main():
                                 
                                 import pandas as pd
                                 df_itens = pd.DataFrame(dados['itens'])
+                                # Padronizar nome da coluna - pode vir como 'nome' ou 'produto'
+                                if 'produto' in df_itens.columns and 'nome' not in df_itens.columns:
+                                    df_itens['nome'] = df_itens['produto']
                                 df_itens['Quantidade'] = df_itens['quantidade'].apply(lambda x: f"{x:.2f}")
                                 df_itens['Valor Unit.'] = df_itens['valor_unitario'].apply(lambda x: f"R$ {x:.2f}")
                                 df_itens['Valor Total'] = df_itens['valor_total'].apply(lambda x: f"R$ {x:.2f}")
