@@ -3417,6 +3417,14 @@ IMPORTANTE:
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro: {str(e)}")
+                            
+                            if st.button("🗑️", key=f"del_parcela_{parcela['id']}", help="Excluir parcela", use_container_width=True):
+                                try:
+                                    supabase.table("singelo_parcelas_compras").delete().eq("id", parcela['id']).execute()
+                                    st.success("✅ Parcela excluída!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro: {str(e)}")
                 else:
                     st.info("✅ Nenhuma parcela pendente no período selecionado")
             
@@ -3457,6 +3465,14 @@ IMPORTANTE:
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Erro: {str(e)}")
+                            
+                            if st.button("🗑️", key=f"del_parcela_paga_{parcela['id']}", help="Excluir parcela", use_container_width=True):
+                                try:
+                                    supabase.table("singelo_parcelas_compras").delete().eq("id", parcela['id']).execute()
+                                    st.success("✅ Parcela excluída!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erro: {str(e)}")
                 else:
                     st.info("Nenhuma parcela paga no período selecionado")
         else:
