@@ -1352,7 +1352,8 @@ def main():
             if vendas_periodo.data:
                 for venda in vendas_periodo.data:
                     data_venda = datetime.fromisoformat(venda['data'].replace('Z', '+00:00'))
-                    if data_inicio_filtro <= data_venda <= data_fim_filtro:
+                    # Comparar apenas as datas (sem hora)
+                    if data_inicio_filtro.date() <= data_venda.date() <= data_fim_filtro.date():
                         vendas_filtradas.append(venda)
             
             if vendas_filtradas:
