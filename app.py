@@ -1344,6 +1344,38 @@ def main():
                     <h2>R$ {resumo['total_vendas']:,.2f}</h2>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # Buscar vendas do período
+            vendas_periodo = supabase.table("singelo_vendas").select("*").execute()
+            vendas_filtradas = []
+            
+            if vendas_periodo.data:
+                for venda in vendas_periodo.data:
+                    data_venda = datetime.fromisoformat(venda['data'].replace('Z', '+00:00'))
+                    if data_inicio_filtro <= data_venda <= data_fim_filtro:
+                        vendas_filtradas.append(venda)
+            
+            if vendas_filtradas:
+                with st.expander(f"📋 Ver {len(vendas_filtradas)} venda(s)"):
+                    for venda in vendas_filtradas:
+                        data_venda = datetime.fromisoformat(venda['data'].replace('Z', '+00:00'))
+                        data_entrega = None
+                        if venda.get('data_entrega'):
+                            try:
+                                if isinstance(venda['data_entrega'], str):
+                                    data_entrega = datetime.fromisoformat(venda['data_entrega'].replace('Z', '+00:00'))
+                                else:
+                                    data_entrega = venda['data_entrega']
+                            except:
+                                pass
+                        
+                        st.markdown(f"""
+                        <div style='padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
+                            <small>📝 {data_venda.strftime('%d/%m/%Y %H:%M')}{f" | 🚚 Entrega: {data_entrega.strftime('%d/%m/%Y')}" if data_entrega else ""}</small><br>
+                            <strong>R$ {float(venda['valor_total']):,.2f}</strong> - {venda['quantidade']}x {venda['produto']}<br>
+                            <small>📏 {venda.get('tamanho', 'N/A')}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
         
         with col4:
             lucro_color = "#28A745" if resumo['lucro'] >= 0 else "#DC3545"
