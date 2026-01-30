@@ -404,9 +404,24 @@ def extrair_dados_html_nfce(html_content):
         
         for match in matches:
             nome_prod = match.group(1).strip()
-            qtd = float(match.group(2).replace(',', '.'))
+            qtd_str = match.group(2).replace(',', '.')
+            qtd = float(qtd_str)
             valor_unit = float(match.group(3).replace(',', '.'))
             valor_item = float(match.group(4).replace(',', '.'))
+            
+            # Verificar se o cálculo bate: quantidade × valor_unitário ≈ valor_total
+            # Se não bater, pode ser que a quantidade esteja em formato diferente
+            calc_esperado = qtd * valor_unit
+            diferenca = abs(calc_esperado - valor_item)
+            
+            # Se a diferença for muito grande (mais de 10%), tentar corrigir
+            if diferenca > (valor_item * 0.1):
+                # Tentar recalcular a quantidade baseado no valor total
+                if valor_unit > 0:
+                    qtd_corrigida = valor_item / valor_unit
+                    # Verificar se faz sentido (ex: 0.025 virou 0.250)
+                    if abs(qtd_corrigida - qtd) > 0.01:
+                        qtd = qtd_corrigida
             
             itens.append({
                 'produto': nome_prod,
@@ -424,7 +439,7 @@ def extrair_dados_html_nfce(html_content):
         if itens:
             descricao += "\n\nItens comprados:"
             for i, item in enumerate(itens, 1):
-                descricao += f"\n{i}. {item['produto']} - {item['quantidade']:.0f} un - R$ {item['valor_total']:.2f}"
+                descricao += f"\n{i}. {item['produto']} - {item['quantidade']:.4f} un - R$ {item['valor_total']:.2f}"
         
         return {
             "valor_total": valor_total,
