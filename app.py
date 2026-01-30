@@ -2093,6 +2093,77 @@ def main():
                                             st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
                                             st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
                                         
+                                        # ========== VERIFICAÇÃO DE PRODUTOS SIMILARES ==========
+                                        st.markdown("---")
+                                        
+                                        # Buscar todos os materiais para comparar
+                                        materiais_existentes_response = supabase.table("singelo_materiais").select("*").execute()
+                                        materiais_similares = []
+                                        produto_exato = None
+                                        
+                                        if materiais_existentes_response.data:
+                                            materiais_similares = buscar_materiais_similares(
+                                                nome_material, 
+                                                materiais_existentes_response.data,
+                                                limiar=0.6
+                                            )
+                                            
+                                            # Verificar se existe produto EXATAMENTE igual
+                                            for mat in materiais_existentes_response.data:
+                                                if mat['nome'].lower().strip() == nome_material.lower().strip():
+                                                    produto_exato = mat
+                                                    break
+                                        
+                                        # Mostrar avisos de produtos similares
+                                        if produto_exato:
+                                            custo_cadastrado = float(produto_exato['custo_unitario'])
+                                            diferenca_percentual = abs(custo_cadastrado - valor_unitario_real) / custo_cadastrado * 100 if custo_cadastrado > 0 else 0
+                                            
+                                            if diferenca_percentual > 5:  # Avisar se diferença maior que 5%
+                                                st.warning(f"""
+                                                ⚠️ **ATENÇÃO: Este produto JÁ EXISTE no sistema!**
+                                                
+                                                - **Produto:** {produto_exato['nome']}
+                                                - **Custo cadastrado:** R$ {custo_cadastrado:.4f}/{produto_exato['unidade_medida']}
+                                                - **Custo desta compra:** R$ {valor_unitario_real:.4f}/{unidade_med}
+                                                - **Diferença:** {diferenca_percentual:.1f}% {'🔴 MAIS CARO' if valor_unitario_real > custo_cadastrado else '🟢 MAIS BARATO'}
+                                                
+                                                Ao cadastrar, o sistema irá:
+                                                - ✅ Somar {qtd_real_unidades:.4f} {unidade_med} ao estoque atual
+                                                - 📊 Recalcular o custo médio ponderado automaticamente
+                                                """)
+                                            else:
+                                                st.info(f"""
+                                                ℹ️ **Este produto já existe no sistema**
+                                                
+                                                - **Custo cadastrado:** R$ {custo_cadastrado:.4f}
+                                                - **Custo nova compra:** R$ {valor_unitario_real:.4f}
+                                                - Diferença: {diferenca_percentual:.1f}%
+                                                
+                                                O estoque e custo médio serão atualizados automaticamente.
+                                                """)
+                        
+                                        elif materiais_similares:
+                                            st.warning(f"""
+                                            ⚠️ **ATENÇÃO: Encontrados {len(materiais_similares)} produto(s) similar(es)!**
+                                            
+                                            Verifique se não é o mesmo produto com nome diferente:
+                                            """)
+                                            
+                                            for similar in materiais_similares[:3]:  # Mostrar até 3 similares
+                                                mat = similar['material']
+                                                custo_similar = float(mat['custo_unitario'])
+                                                diferenca_preco = abs(custo_similar - valor_unitario_real) / custo_similar * 100 if custo_similar > 0 else 0
+                                                
+                                                st.error(f"""
+                                                🔍 **{mat['nome']}** ({similar['similaridade']*100:.0f}% similar)
+                                                - Custo cadastrado: R$ {custo_similar:.4f}/{mat['unidade_medida']}
+                                                - Custo desta compra: R$ {valor_unitario_real:.4f}/{unidade_med}
+                                                - Diferença: {diferenca_preco:.1f}% {'🔴 MAIS CARO' if valor_unitario_real > custo_similar else '🟢 MAIS BARATO'}
+                                                """)
+                                            
+                                            st.info("💡 **Dica:** Se for o mesmo produto, ajuste o nome acima para ficar igual e evitar duplicatas!")
+                                        
                                         # Botão para cadastrar como material
                                         col_btn = st.columns(1)[0]
                                         with col_btn:
@@ -2351,6 +2422,77 @@ def main():
                                             
                                             st.metric("💰 Custo por Unidade", f"R$ {valor_unitario_real:.4f}")
                                             st.success(f"✅ R$ {valor_total_item:.2f} ÷ {qtd_real_unidades:.0f} un = R$ {valor_unitario_real:.4f}/un")
+                                        
+                                        # ========== VERIFICAÇÃO DE PRODUTOS SIMILARES ==========
+                                        st.markdown("---")
+                                        
+                                        # Buscar todos os materiais para comparar
+                                        materiais_existentes_response = supabase.table("singelo_materiais").select("*").execute()
+                                        materiais_similares = []
+                                        produto_exato = None
+                                        
+                                        if materiais_existentes_response.data:
+                                            materiais_similares = buscar_materiais_similares(
+                                                nome_material, 
+                                                materiais_existentes_response.data,
+                                                limiar=0.6
+                                            )
+                                            
+                                            # Verificar se existe produto EXATAMENTE igual
+                                            for mat in materiais_existentes_response.data:
+                                                if mat['nome'].lower().strip() == nome_material.lower().strip():
+                                                    produto_exato = mat
+                                                    break
+                                        
+                                        # Mostrar avisos de produtos similares
+                                        if produto_exato:
+                                            custo_cadastrado = float(produto_exato['custo_unitario'])
+                                            diferenca_percentual = abs(custo_cadastrado - valor_unitario_real) / custo_cadastrado * 100 if custo_cadastrado > 0 else 0
+                                            
+                                            if diferenca_percentual > 5:  # Avisar se diferença maior que 5%
+                                                st.warning(f"""
+                                                ⚠️ **ATENÇÃO: Este produto JÁ EXISTE no sistema!**
+                                                
+                                                - **Produto:** {produto_exato['nome']}
+                                                - **Custo cadastrado:** R$ {custo_cadastrado:.4f}/{produto_exato['unidade_medida']}
+                                                - **Custo desta compra:** R$ {valor_unitario_real:.4f}/{unidade_med}
+                                                - **Diferença:** {diferenca_percentual:.1f}% {'🔴 MAIS CARO' if valor_unitario_real > custo_cadastrado else '🟢 MAIS BARATO'}
+                                                
+                                                Ao cadastrar, o sistema irá:
+                                                - ✅ Somar {qtd_real_unidades:.4f} {unidade_med} ao estoque atual
+                                                - 📊 Recalcular o custo médio ponderado automaticamente
+                                                """)
+                                            else:
+                                                st.info(f"""
+                                                ℹ️ **Este produto já existe no sistema**
+                                                
+                                                - **Custo cadastrado:** R$ {custo_cadastrado:.4f}
+                                                - **Custo nova compra:** R$ {valor_unitario_real:.4f}
+                                                - Diferença: {diferenca_percentual:.1f}%
+                                                
+                                                O estoque e custo médio serão atualizados automaticamente.
+                                                """)
+                        
+                                        elif materiais_similares:
+                                            st.warning(f"""
+                                            ⚠️ **ATENÇÃO: Encontrados {len(materiais_similares)} produto(s) similar(es)!**
+                                            
+                                            Verifique se não é o mesmo produto com nome diferente:
+                                            """)
+                                            
+                                            for similar in materiais_similares[:3]:  # Mostrar até 3 similares
+                                                mat = similar['material']
+                                                custo_similar = float(mat['custo_unitario'])
+                                                diferenca_preco = abs(custo_similar - valor_unitario_real) / custo_similar * 100 if custo_similar > 0 else 0
+                                                
+                                                st.error(f"""
+                                                🔍 **{mat['nome']}** ({similar['similaridade']*100:.0f}% similar)
+                                                - Custo cadastrado: R$ {custo_similar:.4f}/{mat['unidade_medida']}
+                                                - Custo desta compra: R$ {valor_unitario_real:.4f}/{unidade_med}
+                                                - Diferença: {diferenca_preco:.1f}% {'🔴 MAIS CARO' if valor_unitario_real > custo_similar else '🟢 MAIS BARATO'}
+                                                """)
+                                            
+                                            st.info("💡 **Dica:** Se for o mesmo produto, ajuste o nome acima para ficar igual e evitar duplicatas!")
                                         
                                         # Botão para cadastrar como material
                                         col_btn = st.columns(1)[0]
@@ -3436,21 +3578,81 @@ IMPORTANTE:
                                     with col4:
                                         if st.button("➕ Converter", key=f"conv_antigo_{idx}_{item['id']}", use_container_width=True):
                                             try:
+                                                # Buscar materiais existentes para verificar similares
+                                                todos_materiais = supabase.table("singelo_materiais").select("*").execute()
+                                                produto_similar = None
+                                                produto_exato = None
+                                                
+                                                if todos_materiais.data:
+                                                    # Verificar se já existe produto exatamente igual
+                                                    for mat in todos_materiais.data:
+                                                        if mat['nome'].lower().strip() == nome_limpo.lower().strip():
+                                                            produto_exato = mat
+                                                            break
+                                                    
+                                                    # Se não achou exato, buscar similares
+                                                    if not produto_exato:
+                                                        similares = buscar_materiais_similares(nome_limpo, todos_materiais.data, limiar=0.7)
+                                                        if similares:
+                                                            produto_similar = similares[0]['material']
+                                                
+                                                # Se encontrou produto similar ou igual
+                                                if produto_exato or produto_similar:
+                                                    produto_ref = produto_exato or produto_similar
+                                                    custo_cadastrado = float(produto_ref['custo_unitario'])
+                                                    diferenca_percentual = abs(custo_cadastrado - custo_real) / custo_cadastrado * 100 if custo_cadastrado > 0 else 0
+                                                    
+                                                    tipo_match = "EXATO" if produto_exato else "SIMILAR"
+                                                    
+                                                    if diferenca_percentual > 5:
+                                                        st.error(f"""
+                                                        ⚠️ **PRODUTO {tipo_match} ENCONTRADO COM PREÇO DIFERENTE!**
+                                                        
+                                                        - **Cadastrado:** {produto_ref['nome']} - R$ {custo_cadastrado:.4f}
+                                                        - **Este item:** {nome_limpo} - R$ {custo_real:.4f}
+                                                        - **Diferença:** {diferenca_percentual:.1f}% {'🔴 MAIS CARO' if custo_real > custo_cadastrado else '🟢 MAIS BARATO'}
+                                                        
+                                                        ❌ **Conversão cancelada!** Verifique se é o mesmo produto e ajuste manualmente se necessário.
+                                                        """)
+                                                        continue
+                                                
                                                 # Detectar unidade automaticamente
                                                 unidade_auto = detectar_unidade_material(nome_limpo)
                                                 
-                                                material_data = {
-                                                    "nome": nome_limpo,
-                                                    "descricao": item.get('descricao', ''),
-                                                    "unidade_medida": unidade_auto,
-                                                    "estoque_atual": qtd_real,
-                                                    "custo_unitario": custo_real,
-                                                    "ultima_compra_data": datetime.now().date().isoformat(),
-                                                    "fornecedor_principal": "NF-e Importada",
-                                                    "observacoes": f"Convertido de item antigo - {qtd_embalagem} unidades/embalagem"
-                                                }
-                                                supabase.table("singelo_materiais").insert(material_data).execute()
-                                                st.success(f"✅ Convertido!")
+                                                # Se passou pela verificação, cadastrar
+                                                if produto_exato:
+                                                    # Atualizar produto existente
+                                                    material_id = produto_exato['id']
+                                                    estoque_antigo = float(produto_exato['estoque_atual'])
+                                                    custo_antigo = float(produto_exato['custo_unitario'])
+                                                    
+                                                    # Calcular custo médio ponderado
+                                                    custo_medio = calcular_custo_medio_ponderado(estoque_antigo, custo_antigo, qtd_real, custo_real)
+                                                    novo_estoque = estoque_antigo + qtd_real
+                                                    
+                                                    supabase.table("singelo_materiais").update({
+                                                        "custo_unitario": custo_medio,
+                                                        "estoque_atual": novo_estoque,
+                                                        "ultima_compra_data": datetime.now().date().isoformat(),
+                                                        "updated_at": datetime.now().isoformat()
+                                                    }).eq("id", material_id).execute()
+                                                    
+                                                    st.success(f"✅ Estoque atualizado! {estoque_antigo:.2f} + {qtd_real:.2f} = {novo_estoque:.2f}")
+                                                else:
+                                                    # Cadastrar novo material
+                                                    material_data = {
+                                                        "nome": nome_limpo,
+                                                        "descricao": item.get('descricao', ''),
+                                                        "unidade_medida": unidade_auto,
+                                                        "estoque_atual": qtd_real,
+                                                        "custo_unitario": custo_real,
+                                                        "ultima_compra_data": datetime.now().date().isoformat(),
+                                                        "fornecedor_principal": "NF-e Importada",
+                                                        "observacoes": f"Convertido de item antigo - {qtd_embalagem} unidades/embalagem"
+                                                    }
+                                                    supabase.table("singelo_materiais").insert(material_data).execute()
+                                                    st.success(f"✅ Convertido!")
+                                                
                                                 st.rerun()
                                             except Exception as e:
                                                 st.error(f"Erro: {str(e)}")
