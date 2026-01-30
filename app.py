@@ -1351,9 +1351,20 @@ def main():
             
             if vendas_periodo.data:
                 for venda in vendas_periodo.data:
-                    data_venda = datetime.fromisoformat(venda['data'].replace('Z', '+00:00'))
-                    # Comparar apenas as datas (sem hora)
-                    if data_inicio_filtro.date() <= data_venda.date() <= data_fim_filtro.date():
+                    data_venda = datetime.fromisoformat(venda['data'].replace('Z', '+00:00')).date()
+                    
+                    # Se tiver filtro aplicado
+                    if data_inicio_filtro and data_fim_filtro:
+                        if data_inicio_filtro <= data_venda <= data_fim_filtro:
+                            vendas_filtradas.append(venda)
+                    elif data_inicio_filtro:
+                        if data_venda >= data_inicio_filtro:
+                            vendas_filtradas.append(venda)
+                    elif data_fim_filtro:
+                        if data_venda <= data_fim_filtro:
+                            vendas_filtradas.append(venda)
+                    else:
+                        # Sem filtro, mostrar todas
                         vendas_filtradas.append(venda)
             
             if vendas_filtradas:
