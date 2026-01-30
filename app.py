@@ -3400,7 +3400,7 @@ IMPORTANTE:
                             
                             with st.expander(f"📦 Ver {len(itens_nao_convertidos)} itens para converter"):
                                 for idx, item in enumerate(itens_nao_convertidos[:20]):  # Mostrar no máximo 20
-                                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                                    col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 0.5])
                                     
                                     with col1:
                                         nome_original = item['nome_produto']
@@ -3431,7 +3431,7 @@ IMPORTANTE:
                                         st.metric("Custo/Un", f"R$ {custo_real:.4f}")
                                     
                                     with col3:
-                                        st.metric("Qtd", f"{qtd_real:.0f}")
+                                        st.metric("Qtd", f"{qtd_real:.4f}")
                                     
                                     with col4:
                                         if st.button("➕ Converter", key=f"conv_antigo_{idx}_{item['id']}", use_container_width=True):
@@ -3454,6 +3454,15 @@ IMPORTANTE:
                                                 st.rerun()
                                             except Exception as e:
                                                 st.error(f"Erro: {str(e)}")
+                                    
+                                    with col5:
+                                        if st.button("🗑️", key=f"del_antigo_{idx}_{item['id']}", help="Excluir este item", use_container_width=True):
+                                            try:
+                                                supabase.table("singelo_itens_compras").delete().eq("id", item['id']).execute()
+                                                st.success("✅ Item excluído!")
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Erro ao excluir: {str(e)}")
                                 
                                 # Botão para converter todos
                                 if st.button("✨ Converter TODOS os itens em materiais", type="primary", use_container_width=True):
