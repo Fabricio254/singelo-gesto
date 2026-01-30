@@ -1667,10 +1667,11 @@ def main():
                                 
                                 qtd_real_unidades = st.number_input(
                                     "📦 Quantidade REAL de unidades",
-                                    min_value=1.0,
+                                    min_value=0.01,
                                     value=float(qtd_sugerida),
-                                    step=1.0,
-                                    help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                    step=0.01,
+                                    format="%.4f",
+                                    help="Ex: 0.25 para 250g, 3 pacotes de 50 = 150",
                                     key=f"qtd_real_manual_{idx}"
                                 )
                                 
@@ -2063,10 +2064,11 @@ def main():
                                             
                                             qtd_real_unidades = st.number_input(
                                                 "📦 Quantidade REAL de unidades",
-                                                min_value=1.0,
+                                                min_value=0.01,
                                                 value=float(qtd_sugerida),
-                                                step=1.0,
-                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                                step=0.01,
+                                                format="%.4f",
+                                                help="Ex: 0.25 para 250g, 3 pacotes de 50 = 150",
                                                 key=f"qtd_real_{idx}"
                                             )
                                             
@@ -2321,10 +2323,11 @@ def main():
                                             
                                             qtd_real_unidades = st.number_input(
                                                 "📦 Quantidade REAL de unidades",
-                                                min_value=1.0,
+                                                min_value=0.01,
                                                 value=float(qtd_sugerida),
-                                                step=1.0,
-                                                help="Ex: Se comprou 3 pacotes de 50, coloque 150",
+                                                step=0.01,
+                                                format="%.4f",
+                                                help="Ex: 0.25 para 250g, 3 pacotes de 50 = 150",
                                                 key=f"qtd_real_cupom_{idx}"
                                             )
                                             
