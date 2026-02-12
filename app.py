@@ -1371,7 +1371,18 @@ def main():
                         vendas_filtradas.append(venda)
             
             if vendas_filtradas:
-                with st.expander(f"📋 Ver {len(vendas_filtradas)} venda(s)"):
+                # Calcular soma total das vendas do período
+                soma_vendas = sum([float(v['valor_total']) for v in vendas_filtradas])
+                
+                with st.expander(f"📋 Ver {len(vendas_filtradas)} venda(s) - Total: R$ {soma_vendas:,.2f}"):
+                    st.markdown(f"""
+                    <div style='padding: 12px; margin: 8px 0; background: rgba(76, 175, 80, 0.2); border-radius: 5px; border-left: 4px solid #4CAF50;'>
+                        <strong>💰 Soma Total do Período: R$ {soma_vendas:,.2f}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    
                     for venda in vendas_filtradas:
                         data_venda = datetime.fromisoformat(venda['data'].replace('Z', '+00:00'))
                         data_entrega = None
