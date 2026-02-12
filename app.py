@@ -1117,12 +1117,13 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
         
         total_custo_entregador = sum([float(e['custo_entregador']) for e in entregas.data]) if entregas.data else 0
         
-        # Total de vendas = valor da venda + taxa de entrega cobrada do cliente
-        total_vendas = sum([float(v['valor_total']) + float(v.get('taxa_entrega', 0)) for v in vendas.data]) if vendas.data else 0
+        # Total de vendas = APENAS valor da venda (SEM taxa de entrega)
+        total_vendas = sum([float(v['valor_total']) for v in vendas.data]) if vendas.data else 0
         total_taxa_entrega_cobrada = sum([float(v.get('taxa_entrega', 0)) for v in vendas.data]) if vendas.data else 0
         
         lucro_entregas = total_taxa_entrega_cobrada - total_custo_entregador
-        lucro = total_vendas - total_compras
+        # Lucro agora considera taxa de entrega separadamente
+        lucro = (total_vendas + total_taxa_entrega_cobrada) - total_compras
         
         return {
             "total_compras": total_compras,
