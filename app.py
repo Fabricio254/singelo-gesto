@@ -1207,24 +1207,17 @@ def main():
             st.markdown("### 📅 Filtrar por Período")
             col1, col2, col3 = st.columns([2, 2, 1])
             
-            # Data padrão: dia 12 do mês atual até dia 12 do próximo mês
+            # Data padrão: 1º de janeiro do ano atual até hoje
             hoje = datetime.now()
-            data_inicio_padrao = datetime(hoje.year, hoje.month, 12)
-            
-            # Calcular dia 12 do próximo mês
-            mes_fim = hoje.month + 1
-            ano_fim = hoje.year
-            if mes_fim > 12:
-                mes_fim = 1
-                ano_fim += 1
-            data_fim_padrao = datetime(ano_fim, mes_fim, 12)
+            data_inicio_padrao = datetime(hoje.year, 1, 1)  # Primeiro dia do ano
+            data_fim_padrao = hoje  # Dia de hoje
             
             with col1:
                 data_inicio = st.date_input(
                     "Data Início",
                     value=data_inicio_padrao,
                     format="DD/MM/YYYY",
-                    help="Data de início do período (padrão: dia 12 do mês atual)",
+                    help="Data de início do período (padrão: 1º de janeiro do ano atual)",
                     key="data_inicio_dash"
                 )
             
@@ -1233,7 +1226,7 @@ def main():
                     "Data Fim",
                     value=data_fim_padrao,
                     format="DD/MM/YYYY",
-                    help="Data de fim do período (padrão: dia 12 do próximo mês)",
+                    help="Data de fim do período (padrão: dia de hoje)",
                     key="data_fim_dash"
                 )
             
