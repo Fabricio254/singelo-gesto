@@ -1563,6 +1563,25 @@ def main():
                                 margem = ((preco_medio - custo) / preco_medio * 100) if preco_medio > 0 else 0
                                 produtos_analise.append(f"- {prod}: custo R${custo:.2f}, preço médio R${preco_medio:.2f}, margem {margem:.1f}%, {qtd_vendida_ia.get(prod,0)} unidades vendidas")
                         
+                        # Buscar parcelas futuras pendentes (compromisso além do período)
+                        data_referencia = data_fim_filtro.isoformat() if data_fim_filtro else datetime.now().date().isoformat()
+                        parcelas_futuras_res = supabase.table("singelo_parcelas_compras") \
+                            .select("valor_parcela, data_vencimento, descricao, numero_parcela, total_parcelas") \
+                            .eq("status", "pendente") \
+                            .gt("data_vencimento", data_referencia) \
+                            .execute()
+                        
+                        parcelas_futuras = [p for p in parcelas_futuras_res.data 
+                            if not (p.get('descricao','').lower().startswith('custo automático') 
+                                    or p.get('descricao','').lower().startswith('custo automatico'))
+                        ] if parcelas_futuras_res.data else []
+                        
+                        total_futuro = sum(float(p['valor_parcela']) for p in parcelas_futuras)
+                        parcelas_futuras_linhas = []
+                        for p in parcelas_futuras:
+                            venc = datetime.fromisoformat(p['data_vencimento'].replace('Z','+00:00'))
+                            parcelas_futuras_linhas.append(f"  • Venc {venc.strftime('%d/%m/%Y')}: R${float(p['valor_parcela']):,.2f} ({p['numero_parcela']}/{p['total_parcelas']}x) - {p.get('descricao','')[:40]}")
+                        
                         periodo_str = ""
                         if data_inicio_filtro and data_fim_filtro:
                             periodo_str = f"{data_inicio_filtro.strftime('%d/%m/%Y')} a {data_fim_filtro.strftime('%d/%m/%Y')}"
@@ -1585,14 +1604,19 @@ RESUMO GERAL:
 ANÁLISE POR PRODUTO:
 {chr(10).join(produtos_analise) if produtos_analise else "Dados de produtos não disponíveis"}
 
+COMPROMISSOS FUTUROS (parcelas de cartão ainda em aberto APÓS o período):
+- Total a pagar no futuro: R$ {total_futuro:,.2f} em {len(parcelas_futuras)} parcela(s) pendente(s)
+{chr(10).join(parcelas_futuras_linhas[:10]) if parcelas_futuras_linhas else "  Nenhuma parcela futura em aberto"}
+
 === INSTRUÇÕES PARA O RELATÓRIO ===
 Escreva um relatório executivo completo com:
 1. **Situação Geral** - diagnóstico rápido da saúde financeira
 2. **Pontos Positivos** - o que está indo bem
 3. **Pontos de Atenção** - riscos e áreas de melhoria
 4. **Análise dos Produtos** - quais têm melhor/pior margem e recomendações
-5. **Recomendações Estratégicas** - 3 a 5 ações concretas para melhorar os resultados
-6. **Conclusão** - resumo para a diretoria
+5. **Compromissos Futuros** - análise das parcelas ainda em aberto e impacto no caixa dos próximos meses
+6. **Recomendações Estratégicas** - 3 a 5 ações concretas para melhorar os resultados
+7. **Conclusão** - resumo para a diretoria
 
 Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reais nos comentários."""
 
