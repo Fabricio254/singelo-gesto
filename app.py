@@ -1283,10 +1283,13 @@ def main():
                                       or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo_cartao.data else []
             
             if parcelas_cartao:
-                # Ordenar por data de vencimento decrescente (mais recentes em cima)
-                parcelas_cartao_ordenadas = sorted(parcelas_cartao, 
-                                                   key=lambda p: datetime.fromisoformat(p['data_vencimento'].replace('Z', '+00:00')), 
-                                                   reverse=True)
+                # Ordenar por data de EMISSÃO decrescente (mais recentes em cima), fallback para vencimento
+                def key_emissao(p):
+                    if p.get('singelo_compras') and p['singelo_compras'].get('data'):
+                        return datetime.fromisoformat(p['singelo_compras']['data'].replace('Z', '+00:00'))
+                    return datetime.fromisoformat(p['data_vencimento'].replace('Z', '+00:00'))
+                
+                parcelas_cartao_ordenadas = sorted(parcelas_cartao, key=key_emissao, reverse=True)
                 with st.expander(f"📋 Ver {len(parcelas_cartao_ordenadas)} parcela(s)"):
                     for parcela in parcelas_cartao_ordenadas:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
