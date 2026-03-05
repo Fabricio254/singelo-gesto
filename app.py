@@ -1597,18 +1597,44 @@ Escreva um relatório executivo completo com:
 Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reais nos comentários."""
 
                         api_key = st.secrets.get('GEMINI_API_KEY') or st.secrets.GEMINI_API_KEY
-                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
                         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                        response = req_gemini.post(url, json=payload, timeout=30)
                         
-                        if response.status_code == 429:
-                            st.warning("⏳ Limite da API atingido (muitas requisições). Aguarde 1 minuto e tente novamente.")
-                        else:
-                            response.raise_for_status()
+                        # Lista de modelos para tentar em ordem
+                        modelos = [
+                            "gemini-2.0-flash",
+                            "gemini-1.5-flash",
+                            "gemini-flash-latest",
+                            "gemini-1.5-flash-latest",
+                        ]
+                        
+                        response = None
+                        modelo_usado = None
+                        for modelo in modelos:
+                            try:
+                                url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
+                                r = req_gemini.post(url, json=payload, timeout=30)
+                                if r.status_code in [200]:
+                                    response = r
+                                    modelo_usado = modelo
+                                    break
+                                elif r.status_code == 429:
+                                    st.warning("⏳ Limite da API atingido. Aguarde 1 minuto e tente novamente.")
+                                    response = None
+                                    break
+                            except req_gemini.exceptions.Timeout:
+                                continue
+                            except Exception:
+                                continue
+                        
+                        if response and response.status_code == 200:
                             resultado = response.json()
                             texto_analise = resultado['candidates'][0]['content']['parts'][0]['text']
                             st.session_state['analise_ia_texto'] = texto_analise
                             st.session_state['analise_ia_periodo'] = periodo_str
+                        elif response is None:
+                            pass  # mensagem já exibida acima
+                        else:
+                            st.error(f"Nenhum modelo disponível no momento. Tente novamente em instantes.")
                         
                     except req_gemini.exceptions.Timeout:
                         st.error("⏱️ Tempo limite excedido. A IA demorou muito para responder. Tente novamente.")
