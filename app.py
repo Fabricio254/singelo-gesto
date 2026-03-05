@@ -1269,13 +1269,18 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-            # Buscar parcelas pendentes do período (EXCLUIR custos automáticos)
-            parcelas_periodo = buscar_parcelas_pendentes(supabase, data_inicio_filtro, data_fim_filtro)
-            # Filtrar: apenas parcelas pendentes que NÃO sejam de custo automático
-            parcelas_cartao = [p for p in parcelas_periodo 
-                              if p['status'] == 'pendente' 
-                              and not (p.get('descricao', '').lower().startswith('custo automático') 
-                                      or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo else []
+            # Buscar parcelas do período EXATO (mesmo filtro do card) - pagas e pendentes
+            query_cartao = supabase.table("singelo_parcelas_compras").select("*, singelo_compras(data, descricao)")
+            if data_inicio_filtro:
+                query_cartao = query_cartao.gte("data_vencimento", data_inicio_filtro.isoformat())
+            if data_fim_filtro:
+                data_fim_cartao = datetime.combine(data_fim_filtro, datetime.max.time())
+                query_cartao = query_cartao.lte("data_vencimento", data_fim_cartao.isoformat())
+            parcelas_periodo_cartao = query_cartao.execute()
+            # Filtrar: apenas parcelas que NÃO sejam de custo automático
+            parcelas_cartao = [p for p in parcelas_periodo_cartao.data 
+                              if not (p.get('descricao', '').lower().startswith('custo automático') 
+                                      or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo_cartao.data else []
             
             if parcelas_cartao:
                 # Ordenar por data de vencimento decrescente (mais recentes em cima)
@@ -1285,6 +1290,9 @@ def main():
                 with st.expander(f"📋 Ver {len(parcelas_cartao_ordenadas)} parcela(s)"):
                     for parcela in parcelas_cartao_ordenadas:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
+                        status_emoji = "✅" if parcela['status'] == 'pago' else "⏰"
+                        status_text = "Pago" if parcela['status'] == 'pago' else "Pendente"
+                        cor_borda = "#28A745" if parcela['status'] == 'pago' else "#F39C12"
                         
                         # Buscar data de emissão se disponível
                         data_emissao_str = ""
@@ -1293,8 +1301,8 @@ def main():
                             data_emissao_str = f"📝 {data_emissao.strftime('%d/%m/%Y')} | "
                         
                         st.markdown(f"""
-                        <div style='padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.1); border-radius: 5px;'>
-                            <small>{data_emissao_str}📅 Venc: {data_venc.strftime('%d/%m/%Y')}</small><br>
+                        <div style='padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.1); border-radius: 5px; border-left: 3px solid {cor_borda};'>
+                            <small>{status_emoji} {status_text} | {data_emissao_str}📅 Venc: {data_venc.strftime('%d/%m/%Y')}</small><br>
                             <strong>R$ {float(parcela['valor_parcela']):,.2f}</strong> - {parcela['numero_parcela']}/{parcela['total_parcelas']}x<br>
                             <small>{parcela.get('descricao', '')[:50]}</small>
                         </div>
