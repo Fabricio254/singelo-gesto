@@ -1599,22 +1599,21 @@ Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reai
                         api_key = st.secrets.get('GEMINI_API_KEY') or st.secrets.GEMINI_API_KEY
                         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
                         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                        response = req_gemini.post(url, json=payload)
+                        response = req_gemini.post(url, json=payload, timeout=30)
                         
                         if response.status_code == 429:
                             st.warning("⏳ Limite da API atingido (muitas requisições). Aguarde 1 minuto e tente novamente.")
-                            st.stop()
+                        else:
+                            response.raise_for_status()
+                            resultado = response.json()
+                            texto_analise = resultado['candidates'][0]['content']['parts'][0]['text']
+                            st.session_state['analise_ia_texto'] = texto_analise
+                            st.session_state['analise_ia_periodo'] = periodo_str
                         
-                        response.raise_for_status()
-                        resultado = response.json()
-                        texto_analise = resultado['candidates'][0]['content']['parts'][0]['text']
-                        
-                        st.session_state['analise_ia_texto'] = texto_analise
-                        st.session_state['analise_ia_periodo'] = periodo_str
-                        
+                    except req_gemini.exceptions.Timeout:
+                        st.error("⏱️ Tempo limite excedido. A IA demorou muito para responder. Tente novamente.")
                     except Exception as e:
                         msg = str(e)
-                        # Esconder API key da mensagem de erro
                         if 'key=' in msg:
                             msg = msg.split('key=')[0] + 'key=***'
                         if '429' in msg:
