@@ -1527,9 +1527,7 @@ def main():
             if gerar_analise:
                 with st.spinner("🤖 Analisando dados financeiros com IA..."):
                     try:
-                        import google.generativeai as genai
-                        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        import requests as req_gemini
                         
                         # Coletar dados de produtos/margens
                         fichas_ia = supabase.table("singelo_fichas_tecnicas").select("*, singelo_materiais(*)").execute()
@@ -1598,8 +1596,15 @@ Escreva um relatório executivo completo com:
 
 Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reais nos comentários."""
 
-                        resposta = model.generate_content(prompt)
-                        st.session_state['analise_ia_texto'] = resposta.text
+                        api_key = st.secrets.get('GEMINI_API_KEY') or st.secrets.GEMINI_API_KEY
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                        response = req_gemini.post(url, json=payload)
+                        response.raise_for_status()
+                        resultado = response.json()
+                        texto_analise = resultado['candidates'][0]['content']['parts'][0]['text']
+                        
+                        st.session_state['analise_ia_texto'] = texto_analise
                         st.session_state['analise_ia_periodo'] = periodo_str
                         
                     except Exception as e:
