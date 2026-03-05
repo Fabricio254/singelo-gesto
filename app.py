@@ -1278,8 +1278,12 @@ def main():
                                       or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo else []
             
             if parcelas_cartao:
-                with st.expander(f"📋 Ver {len(parcelas_cartao)} parcela(s)"):
-                    for parcela in parcelas_cartao:
+                # Ordenar por data de vencimento decrescente (mais recentes em cima)
+                parcelas_cartao_ordenadas = sorted(parcelas_cartao, 
+                                                   key=lambda p: datetime.fromisoformat(p['data_vencimento'].replace('Z', '+00:00')), 
+                                                   reverse=True)
+                with st.expander(f"📋 Ver {len(parcelas_cartao_ordenadas)} parcela(s)"):
+                    for parcela in parcelas_cartao_ordenadas:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
                         
                         # Buscar data de emissão se disponível
@@ -1312,8 +1316,12 @@ def main():
                                       or p.get('descricao', '').lower().startswith('custo automatico'))] if parcelas_periodo else []
             
             if parcelas_custos_box:
-                with st.expander(f"📋 Ver {len(parcelas_custos_box)} custo(s)"):
-                    for parcela in parcelas_custos_box:
+                # Ordenar por data de vencimento decrescente (mais recentes em cima)
+                parcelas_custos_box_ordenadas = sorted(parcelas_custos_box, 
+                                                       key=lambda p: datetime.fromisoformat(p['data_vencimento'].replace('Z', '+00:00')), 
+                                                       reverse=True)
+                with st.expander(f"📋 Ver {len(parcelas_custos_box_ordenadas)} custo(s)"):
+                    for parcela in parcelas_custos_box_ordenadas:
                         data_venc = datetime.fromisoformat(parcela['data_vencimento'].replace('Z', '+00:00'))
                         
                         # Verificar status da parcela
