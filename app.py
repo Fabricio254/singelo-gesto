@@ -1506,6 +1506,126 @@ def main():
         
         # ===== TAB 2: ANÁLISE DE LUCRO =====
         with tab2:
+            
+            # ===== SEÇÃO: ANÁLISE IA DA SAÚDE FINANCEIRA =====
+            st.markdown("### 🤖 Análise Inteligente da Saúde Financeira")
+            st.markdown("Gere um relatório executivo completo baseado nos dados financeiros do período selecionado.")
+            
+            col_btn, col_info = st.columns([1, 3])
+            with col_btn:
+                gerar_analise = st.button("🔍 Gerar Análise IA", type="primary", use_container_width=True)
+            with col_info:
+                periodo_texto = ""
+                if data_inicio_filtro and data_fim_filtro:
+                    periodo_texto = f"📅 Período: {data_inicio_filtro.strftime('%d/%m/%Y')} até {data_fim_filtro.strftime('%d/%m/%Y')}"
+                elif data_inicio_filtro:
+                    periodo_texto = f"📅 A partir de {data_inicio_filtro.strftime('%d/%m/%Y')}"
+                else:
+                    periodo_texto = "📅 Todo o período disponível"
+                st.info(periodo_texto)
+            
+            if gerar_analise:
+                with st.spinner("🤖 Analisando dados financeiros com IA..."):
+                    try:
+                        import google.generativeai as genai
+                        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        
+                        # Coletar dados de produtos/margens
+                        fichas_ia = supabase.table("singelo_fichas_tecnicas").select("*, singelo_materiais(*)").execute()
+                        vendas_ia = supabase.table("singelo_vendas").select("*").execute()
+                        
+                        custos_prod_ia = {}
+                        if fichas_ia.data:
+                            for item in fichas_ia.data:
+                                prod = item['produto']
+                                quantidade = float(item['quantidade'])
+                                custo_unit = float(item['singelo_materiais']['custo_unitario'])
+                                if prod not in custos_prod_ia:
+                                    custos_prod_ia[prod] = 0
+                                custos_prod_ia[prod] += quantidade * custo_unit
+                        
+                        precos_venda_ia = {}
+                        qtd_vendida_ia = {}
+                        if vendas_ia.data:
+                            for v in vendas_ia.data:
+                                prod = v['produto']
+                                valor = float(v['valor_total'])
+                                qtd = int(v['quantidade'])
+                                if prod not in precos_venda_ia:
+                                    precos_venda_ia[prod] = []
+                                    qtd_vendida_ia[prod] = 0
+                                precos_venda_ia[prod].append(valor / qtd)
+                                qtd_vendida_ia[prod] += qtd
+                        
+                        produtos_analise = []
+                        for prod, custo in custos_prod_ia.items():
+                            if prod in precos_venda_ia and precos_venda_ia[prod]:
+                                preco_medio = sum(precos_venda_ia[prod]) / len(precos_venda_ia[prod])
+                                margem = ((preco_medio - custo) / preco_medio * 100) if preco_medio > 0 else 0
+                                produtos_analise.append(f"- {prod}: custo R${custo:.2f}, preço médio R${preco_medio:.2f}, margem {margem:.1f}%, {qtd_vendida_ia.get(prod,0)} unidades vendidas")
+                        
+                        periodo_str = ""
+                        if data_inicio_filtro and data_fim_filtro:
+                            periodo_str = f"{data_inicio_filtro.strftime('%d/%m/%Y')} a {data_fim_filtro.strftime('%d/%m/%Y')}"
+                        else:
+                            periodo_str = "período completo"
+                        
+                        prompt = f"""Você é um consultor financeiro especialista em pequenas empresas. 
+Analise os dados financeiros abaixo da empresa "Singelo" (confecção/personalização de caixas) e gere um relatório executivo em português para a diretoria.
+
+=== DADOS FINANCEIROS - PERÍODO: {periodo_str} ===
+
+RESUMO GERAL:
+- Total de Vendas: R$ {resumo['total_vendas']:,.2f}
+- Lucro Entregas: R$ {resumo['lucro_entregas']:,.2f}
+- Gastos Cartão Crédito (parcelas): R$ {resumo['total_compras_cartao']:,.2f}
+- Custos Box (materiais/produção): R$ {resumo['total_custos_auto']:,.2f}
+- Lucro Líquido: R$ {resumo['lucro']:,.2f}
+- Margem de Lucro Geral: {(resumo['lucro'] / resumo['total_vendas'] * 100) if resumo['total_vendas'] > 0 else 0:.1f}%
+
+ANÁLISE POR PRODUTO:
+{chr(10).join(produtos_analise) if produtos_analise else "Dados de produtos não disponíveis"}
+
+=== INSTRUÇÕES PARA O RELATÓRIO ===
+Escreva um relatório executivo completo com:
+1. **Situação Geral** - diagnóstico rápido da saúde financeira
+2. **Pontos Positivos** - o que está indo bem
+3. **Pontos de Atenção** - riscos e áreas de melhoria
+4. **Análise dos Produtos** - quais têm melhor/pior margem e recomendações
+5. **Recomendações Estratégicas** - 3 a 5 ações concretas para melhorar os resultados
+6. **Conclusão** - resumo para a diretoria
+
+Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reais nos comentários."""
+
+                        resposta = model.generate_content(prompt)
+                        st.session_state['analise_ia_texto'] = resposta.text
+                        st.session_state['analise_ia_periodo'] = periodo_str
+                        
+                    except Exception as e:
+                        st.error(f"Erro ao gerar análise: {e}")
+            
+            if 'analise_ia_texto' in st.session_state:
+                st.markdown("---")
+                st.markdown(f"#### 📋 Relatório Executivo — {st.session_state.get('analise_ia_periodo', '')}")
+                
+                # Card de fundo para o relatório
+                st.markdown(f"""
+                <div style='background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); 
+                            border-radius: 10px; padding: 24px; margin: 10px 0; line-height: 1.8;'>
+                {st.session_state['analise_ia_texto'].replace(chr(10), '<br>')}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Botão copiar
+                st.download_button(
+                    label="📥 Baixar Relatório (.txt)",
+                    data=st.session_state['analise_ia_texto'],
+                    file_name=f"relatorio_financeiro_{st.session_state.get('analise_ia_periodo','').replace('/', '-').replace(' ', '_')}.txt",
+                    mime="text/plain"
+                )
+            
+            st.markdown("---")
             st.markdown("### 📊 Análise de Lucro por Produto")
             
             try:
