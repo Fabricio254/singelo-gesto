@@ -1597,9 +1597,14 @@ Escreva um relatório executivo completo com:
 Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reais nos comentários."""
 
                         api_key = st.secrets.get('GEMINI_API_KEY') or st.secrets.GEMINI_API_KEY
-                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}"
                         payload = {"contents": [{"parts": [{"text": prompt}]}]}
                         response = req_gemini.post(url, json=payload)
+                        
+                        if response.status_code == 429:
+                            st.warning("⏳ Limite da API atingido (muitas requisições). Aguarde 1 minuto e tente novamente.")
+                            st.stop()
+                        
                         response.raise_for_status()
                         resultado = response.json()
                         texto_analise = resultado['candidates'][0]['content']['parts'][0]['text']
@@ -1608,7 +1613,14 @@ Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reai
                         st.session_state['analise_ia_periodo'] = periodo_str
                         
                     except Exception as e:
-                        st.error(f"Erro ao gerar análise: {e}")
+                        msg = str(e)
+                        # Esconder API key da mensagem de erro
+                        if 'key=' in msg:
+                            msg = msg.split('key=')[0] + 'key=***'
+                        if '429' in msg:
+                            st.warning("⏳ Limite da API atingido (muitas requisições). Aguarde 1 minuto e tente novamente.")
+                        else:
+                            st.error(f"Erro ao gerar análise: {msg}")
             
             if 'analise_ia_texto' in st.session_state:
                 st.markdown("---")
