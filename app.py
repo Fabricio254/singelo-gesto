@@ -1613,14 +1613,13 @@ Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reai
                             try:
                                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
                                 r = req_gemini.post(url, json=payload, timeout=30)
-                                if r.status_code in [200]:
+                                if r.status_code == 200:
                                     response = r
                                     modelo_usado = modelo
                                     break
-                                elif r.status_code == 429:
-                                    st.warning("⏳ Limite da API atingido. Aguarde 1 minuto e tente novamente.")
-                                    response = None
-                                    break
+                                else:
+                                    # 429, 503 ou outro erro — tenta próximo modelo
+                                    continue
                             except req_gemini.exceptions.Timeout:
                                 continue
                             except Exception:
@@ -1632,9 +1631,9 @@ Use tom profissional mas acessível. Seja objetivo e direto. Use os valores reai
                             st.session_state['analise_ia_texto'] = texto_analise
                             st.session_state['analise_ia_periodo'] = periodo_str
                         elif response is None:
-                            pass  # mensagem já exibida acima
+                            st.warning("⏳ Todos os modelos estão com limite de requisições no momento. Aguarde 1-2 minutos e tente novamente.")
                         else:
-                            st.error(f"Nenhum modelo disponível no momento. Tente novamente em instantes.")
+                            st.warning("⏳ Todos os modelos estão com limite de requisições. Aguarde 1-2 minutos e tente novamente.")
                         
                     except req_gemini.exceptions.Timeout:
                         st.error("⏱️ Tempo limite excedido. A IA demorou muito para responder. Tente novamente.")
