@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 from datetime import datetime
 from supabase import create_client, Client
 import pandas as pd
@@ -6,6 +6,7 @@ from PIL import Image
 import xml.etree.ElementTree as ET
 import requests
 import re
+from Instagram import collect_profile, product_message, whatsapp_url
 
 # ==================== CONFIGURAÇÕES ====================
 # Versão: 1.2.4 - Fix para variáveis em cálculo de área
@@ -1147,6 +1148,57 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
             "lucro": 0
         }
 
+
+def render_catalogo_instagram():
+    """Importa produtos do Instagram e prepara mensagens para o WhatsApp."""
+    st.markdown("## Catalogo do Instagram")
+    st.caption("Importe as publicacoes, revise os precos e abra a mensagem pronta no WhatsApp.")
+    with st.sidebar:
+        st.markdown("### Importacao do Instagram")
+        username = st.text_input("Usuario do Instagram", "singelo_gesto", key="catalog_username")
+        password = st.text_input("Senha do Instagram", type="password", key="catalog_password")
+        amount = st.number_input("Publicacoes para importar", min_value=1, max_value=200, value=40, step=10, key="catalog_amount")
+        phone = st.text_input("WhatsApp do cliente", placeholder="(27) 99999-9999", key="catalog_phone")
+        importar = st.button("Importar produtos", type="primary", use_container_width=True, key="catalog_import")
+        st.caption("A senha fica somente nesta sessao e nao e gravada no codigo.")
+    if importar:
+        if not username or not password:
+            st.error("Informe o usuario e a senha do Instagram.")
+        else:
+            with st.spinner("Lendo publicacoes, precos e fotos..."):
+                try:
+                    st.session_state.catalog_products = collect_profile(username.strip().lstrip("@"), password, int(amount))
+                    st.success(f"{len(st.session_state.catalog_products)} publicacoes importadas.")
+                except Exception as exc:
+                    st.error(f"Nao foi possivel importar: {exc}")
+                    st.info("Se o Instagram pedir confirmacao, confirme o acesso no aplicativo e tente novamente.")
+    products = st.session_state.get("catalog_products", [])
+    if not products:
+        st.info("Use o painel lateral para importar os produtos do perfil @singelo_gesto.")
+        return
+    search = st.text_input("Buscar produto ou categoria", placeholder="Ex.: aniversario, cafe, caneca", key="catalog_search")
+    query = search.lower().strip()
+    filtered = [item for item in products if not query or query in (item.get("title", "") + " " + item.get("category", "") + " " + item.get("description", "")).lower()]
+    st.write(f"{len(filtered)} produto(s) encontrado(s)")
+    for index, product in enumerate(filtered):
+        title = product.get("title", "Produto")
+        price = product.get("price")
+        price_text = "Consultar valor" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        with st.expander(f"{title} | {price_text}", expanded=index == 0):
+            col_image, col_data = st.columns([1, 2])
+            with col_image:
+                if product.get("image_url"): st.image(product["image_url"], use_container_width=True)
+                else: st.info("Sem imagem")
+            with col_data:
+                product["title"] = st.text_input("Nome do produto", title, key=f"catalog_title_{index}")
+                categories = ["Cafe da manha", "Aniversario", "Maternidade", "Casamento e noivado", "Flores e mimos", "Datas especiais", "Outros"]
+                current = product.get("category", "Outros")
+                product["category"] = st.selectbox("Categoria", categories, index=categories.index(current) if current in categories else 6, key=f"catalog_category_{index}")
+                product["price"] = st.number_input("Preco (R$)", min_value=0.0, value=float(price or 0), step=0.01, key=f"catalog_price_{index}") or None
+                product["description"] = st.text_area("Descricao", product.get("description", ""), height=130, key=f"catalog_description_{index}")
+                st.link_button("Abrir mensagem no WhatsApp", whatsapp_url(phone, product_message(product)), use_container_width=True)
+                if product.get("permalink"): st.link_button("Ver publicacao no Instagram", product["permalink"], use_container_width=True)
+    st.download_button("Baixar catalogo revisado", data=__import__("json").dumps(products, ensure_ascii=False, indent=2, default=str), file_name="catalogo_singelo_gesto.json", mime="application/json", use_container_width=True)
 # ==================== INTERFACE PRINCIPAL ====================
 def main():
     # Configurações da página
@@ -1187,7 +1239,7 @@ def main():
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
             "Selecione uma opção:",
-            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "🧾 Ficha Técnica", "📋 Histórico"],
+            ["📈 Dashboard", "🛒 Lançar Compra", "💰 Lançar Venda", "🚚 Custo Entregador", "💳 Contas a Pagar", "🧾 Ficha Técnica", "📋 Histórico", "📦 Catalogo Instagram"],
             label_visibility="collapsed"
         )
         
@@ -1196,8 +1248,12 @@ def main():
         st.markdown("Sistema de gestão para **Singelo Gesto**")
         st.markdown("Box de Luxo Personalizadas")
     
+    # ==================== CATALOGO INSTAGRAM ====================
+    if opcao == "📦 Catalogo Instagram":
+        render_catalogo_instagram()
+
     # ==================== DASHBOARD ====================
-    if opcao == "📈 Dashboard":
+    elif opcao == "📈 Dashboard":
         st.markdown("## 📈 Dashboard Financeiro")
         
         # Tabs principais do dashboard
