@@ -1156,7 +1156,14 @@ def render_catalogo_instagram():
     st.caption("Cole os links das publicacoes, um por linha, para importar fotos, descricoes e precos.")
     with st.sidebar:
         st.markdown("### Links das publicacoes")
-        links = st.text_area("Links do Instagram", placeholder="https://www.instagram.com/p/ABC123/?img_index=1\nhttps://www.instagram.com/p/DEF456/", height=180, key="catalog_links")
+        default_links = """https://www.instagram.com/p/DRLdkR3EZqE/?img_index=1
+https://www.instagram.com/p/DMtVKcJPniV/?img_index=1
+https://www.instagram.com/p/DDfu-2FEtKx/?img_index=1
+https://www.instagram.com/p/DDfuugq9kchk/?img_index=1
+https://www.instagram.com/p/DdFU9zikaSP/?img_index=1
+https://www.instagram.com/p/DdFUV3YEWNW/?img_index=1
+https://www.instagram.com/p/DdFTtXDkRmD/?img_index=1"""
+        links = st.text_area("Links do Instagram", value=default_links, height=220, key="catalog_links")
         phone = st.text_input("WhatsApp do cliente", placeholder="(27) 99999-9999", key="catalog_phone")
         importar = st.button("Importar links", type="primary", use_container_width=True, key="catalog_import_links")
         st.caption("Nao e necessario informar a senha do Instagram.")
