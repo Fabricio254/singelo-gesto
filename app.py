@@ -6,7 +6,7 @@ from PIL import Image
 import xml.etree.ElementTree as ET
 import requests
 import re
-from Instagram import collect_profile, product_message, whatsapp_url
+from Instagram import collect_post_links, product_message, whatsapp_url
 
 # ==================== CONFIGURAÇÕES ====================
 # Versão: 1.2.4 - Fix para variáveis em cálculo de área
@@ -1149,32 +1149,28 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
         }
 
 
+
 def render_catalogo_instagram():
-    """Importa produtos do Instagram e prepara mensagens para o WhatsApp."""
+    """Importa produtos publicos por links e prepara mensagens para WhatsApp."""
     st.markdown("## Catalogo do Instagram")
-    st.caption("Importe as publicacoes, revise os precos e abra a mensagem pronta no WhatsApp.")
+    st.caption("Cole os links das publicacoes, um por linha, para importar fotos, descricoes e precos.")
     with st.sidebar:
-        st.markdown("### Importacao do Instagram")
-        username = st.text_input("Usuario do Instagram", "singelo_gesto", key="catalog_username")
-        password = st.text_input("Senha do Instagram", type="password", key="catalog_password")
-        amount = st.number_input("Publicacoes para importar", min_value=1, max_value=200, value=40, step=10, key="catalog_amount")
+        st.markdown("### Links das publicacoes")
+        links = st.text_area("Links do Instagram", placeholder="https://www.instagram.com/p/ABC123/?img_index=1\nhttps://www.instagram.com/p/DEF456/", height=180, key="catalog_links")
         phone = st.text_input("WhatsApp do cliente", placeholder="(27) 99999-9999", key="catalog_phone")
-        importar = st.button("Importar produtos", type="primary", use_container_width=True, key="catalog_import")
-        st.caption("A senha fica somente nesta sessao e nao e gravada no codigo.")
+        importar = st.button("Importar links", type="primary", use_container_width=True, key="catalog_import_links")
+        st.caption("Nao e necessario informar a senha do Instagram.")
     if importar:
-        if not username or not password:
-            st.error("Informe o usuario e a senha do Instagram.")
-        else:
-            with st.spinner("Lendo publicacoes, precos e fotos..."):
-                try:
-                    st.session_state.catalog_products = collect_profile(username.strip().lstrip("@"), password, int(amount))
-                    st.success(f"{len(st.session_state.catalog_products)} publicacoes importadas.")
-                except Exception as exc:
-                    st.error(f"Nao foi possivel importar: {exc}")
-                    st.info("Se o Instagram pedir confirmacao, confirme o acesso no aplicativo e tente novamente.")
+        with st.spinner("Lendo publicacoes, precos e fotos..."):
+            try:
+                st.session_state.catalog_products = collect_post_links(links)
+                st.success(f"{len(st.session_state.catalog_products)} publicacao(oes) importada(s).")
+            except Exception as exc:
+                st.error(f"Nao foi possivel importar: {exc}")
+                st.info("Verifique se os links sao publicos e estao completos.")
     products = st.session_state.get("catalog_products", [])
     if not products:
-        st.info("Use o painel lateral para importar os produtos do perfil @singelo_gesto.")
+        st.info("Cole os links no painel lateral para iniciar.")
         return
     search = st.text_input("Buscar produto ou categoria", placeholder="Ex.: aniversario, cafe, caneca", key="catalog_search")
     query = search.lower().strip()
@@ -1199,6 +1195,7 @@ def render_catalogo_instagram():
                 st.link_button("Abrir mensagem no WhatsApp", whatsapp_url(phone, product_message(product)), use_container_width=True)
                 if product.get("permalink"): st.link_button("Ver publicacao no Instagram", product["permalink"], use_container_width=True)
     st.download_button("Baixar catalogo revisado", data=__import__("json").dumps(products, ensure_ascii=False, indent=2, default=str), file_name="catalogo_singelo_gesto.json", mime="application/json", use_container_width=True)
+
 # ==================== INTERFACE PRINCIPAL ====================
 def main():
     # Configurações da página
