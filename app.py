@@ -1199,6 +1199,8 @@ https://www.instagram.com/p/DdFTtXDkRmD/?img_index=1"""
                 product["category"] = st.selectbox("Categoria", categories, index=categories.index(current) if current in categories else 6, key=f"catalog_category_{index}")
                 product["price"] = st.number_input("Preco (R$)", min_value=0.0, value=float(price or 0), step=0.01, key=f"catalog_price_{index}") or None
                 product["description"] = st.text_area("Descricao", product.get("description", ""), height=130, key=f"catalog_description_{index}")
+                if product.get("image_url"):
+                    st.link_button("Abrir foto para anexar", product["image_url"], use_container_width=True)
                 st.link_button("Abrir mensagem no WhatsApp", whatsapp_url(phone, product_message(product)), use_container_width=True)
                 if product.get("permalink"): st.link_button("Ver publicacao no Instagram", product["permalink"], use_container_width=True)
     st.download_button("Baixar catalogo revisado", data=__import__("json").dumps(products, ensure_ascii=False, indent=2, default=str), file_name="catalogo_singelo_gesto.json", mime="application/json", use_container_width=True)

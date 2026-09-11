@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 import requests
 
-PRICE_RE = re.compile(r"(?:R\$\s*|rs\.?\s*)(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)", re.IGNORECASE)
+PRICE_RE = re.compile(r"(?:R\$\s*|rs\.?\s*|\$\s*|💲\s*)(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)", re.IGNORECASE)
 POST_URL_RE = re.compile(r"https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+/?(?:\?[^\s]*)?", re.IGNORECASE)
 
 def parse_brl(value: str) -> float:
@@ -26,6 +26,12 @@ def extract_post_urls(text: str) -> List[str]:
         if clean not in found: found.append(clean)
     return found
 
+def clean_caption(text: str) -> str:
+    text = (text or "").replace("\ufffd", "").replace("\x00", "")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
 def guess_category(text: str) -> str:
     value = (text or "").lower()
     categories = [("Cafe da manha", ("cafe", "manha")), ("Aniversario", ("aniversario", "birthday", "15 anos")), ("Maternidade", ("maternidade", "bebe")), ("Casamento e noivado", ("casamento", "noivado", "noivos", "romantica")), ("Flores e mimos", ("flores", "flor", "caneca", "mimo", "presente")), ("Datas especiais", ("pais", "maes", "namorados", "formatura"))]
@@ -34,7 +40,7 @@ def guess_category(text: str) -> str:
     return "Outros"
 
 def title_from_caption(caption: str) -> str:
-    for line in (caption or "").splitlines():
+    for line in clean_caption(caption).splitlines():
         title = line.strip().strip("#*- ")
         if title and not PRICE_RE.fullmatch(title): return title[:120]
     return "Produto do Instagram"
@@ -42,7 +48,7 @@ def title_from_caption(caption: str) -> str:
 def _url_value(value: Any) -> Optional[str]: return str(value) if value else None
 
 def media_to_product(media: Any, username: str = "singelo_gesto") -> Dict[str, Any]:
-    caption = getattr(media, "caption_text", "") or ""
+    caption = clean_caption(getattr(media, "caption_text", "") or "")
     prices = extract_prices(caption)
     shortcode = getattr(media, "code", "") or ""
     image_urls = []
@@ -54,7 +60,6 @@ def media_to_product(media: Any, username: str = "singelo_gesto") -> Dict[str, A
     return {"instagram_id": str(getattr(media, "pk", "")), "username": username, "title": title_from_caption(caption), "category": guess_category(caption), "description": caption, "price": prices[-1] if prices else None, "prices_found": prices, "image_url": image_urls[0] if image_urls else None, "image_urls": image_urls, "permalink": f"https://www.instagram.com/p/{shortcode}/" if shortcode else "", "taken_at": getattr(media, "taken_at", None)}
 
 def collect_post_links(text: str, username: str = "singelo_gesto") -> List[Dict[str, Any]]:
-    """Coleta publicacoes publicas sem pedir a senha do Instagram."""
     try:
         from instagrapi import Client
     except ImportError as exc:
@@ -96,6 +101,10 @@ def whatsapp_url(phone: str, message: str) -> str:
     return f"https://wa.me/{digits}?text={quote(message)}" if digits else f"https://wa.me/?text={quote(message)}"
 
 def product_message(product: Dict[str, Any]) -> str:
+    title = clean_caption(product.get("title", "Produto"))
+    category = clean_caption(product.get("category", ""))
+    description = clean_caption(product.get("description", ""))
     price = product.get("price")
-    price_text = "Consultar valor" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"Ola! Seguem os detalhes do produto:\n\n{product.get('title', 'Produto')}\n{price_text}\n\n{product.get('description', '')}".strip()
+    price_text = "Consulte o valor e a disponibilidade" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    lines = ["Ola! Tudo bem?", "", "Separei esta opcao da Singelo Gesto para voce:", "", f"Produto: {title}", f"Categoria: {category}", f"Valor: {price_text}", "", "Detalhes:", description, "", "Para reservar, me diga a data e a cidade da entrega."]
+    return "\n".join(lines).strip()
