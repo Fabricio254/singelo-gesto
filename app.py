@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 import requests
 import re
 from Instagram import collect_post_links, product_message, whatsapp_url
+from urllib.parse import quote
 
 # ==================== CONFIGURAÇÕES ====================
 # Versão: 1.2.4 - Fix para variáveis em cálculo de área
@@ -1150,10 +1151,106 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
 
 
 
-def render_catalogo_instagram():
-    """Importa produtos publicos por links e prepara mensagens para WhatsApp."""
-    st.markdown("## Catalogo do Instagram")
-    st.caption("Cole os links das publicacoes, um por linha, para importar fotos, descricoes e precos.")
+
+def salvar_catalogo_instagram(supabase, products):
+    """Salva ou atualiza os produtos importados no banco."""
+    payload = []
+    for product in products:
+        payload.append({
+            "instagram_id": product.get("instagram_id"),
+            "username": product.get("username", "singelo_gesto"),
+            "title": product.get("title", "Produto do Instagram"),
+            "category": product.get("category", "Outros"),
+            "description": product.get("description", ""),
+            "price": product.get("price"),
+            "image_url": product.get("image_url"),
+            "image_urls": product.get("image_urls", []),
+            "permalink": product.get("permalink", ""),
+            "active": True,
+        })
+    if payload:
+        return supabase.table("singelo_catalogo_instagram").upsert(payload, on_conflict="instagram_id").execute()
+    return None
+
+
+def buscar_catalogo_publico(supabase, category=None):
+    query = supabase.table("singelo_catalogo_instagram").select("*").eq("active", True).order("category").order("title")
+    if category and category != "Todas":
+        query = query.eq("category", category)
+    return query.execute().data or []
+
+
+def render_catalogo_publico(supabase):
+    """Pagina publica de vendas, acessada por link compartilhavel."""
+    try:
+        params = st.query_params
+        category = params.get("categoria", "Todas")
+    except Exception:
+        params = st.experimental_get_query_params()
+        category = params.get("categoria", ["Todas"])[0]
+    try:
+        products = buscar_catalogo_publico(supabase, category)
+        all_products = buscar_catalogo_publico(supabase)
+    except Exception:
+        st.error("Catalogo em preparacao. Em breve teremos novas opcoes para voce.")
+        return
+    categories = sorted({item.get("category", "Outros") for item in all_products})
+    st.markdown("""
+    <style>
+    .public-hero { background: #f7eee8; padding: 2rem 2.2rem; border-radius: 8px; margin-bottom: 1.2rem; }
+    .public-hero h1 { color: #68483c; margin: 0; font-size: 2.2rem; }
+    .public-hero p { color: #755f55; margin-bottom: 0; font-size: 1.05rem; }
+    .product-card { background: white; border: 1px solid #eadbd2; border-radius: 8px; padding: 0.8rem; min-height: 100%; box-shadow: 0 2px 8px rgba(80,50,35,.08); }
+    .product-card h3 { color: #68483c; margin: .55rem 0 .25rem; font-size: 1.08rem; }
+    .product-card p { color: #665952; line-height: 1.45; }
+    .price { color: #9b5c45; font-size: 1.25rem; font-weight: 700; }
+    .public-note { color: #755f55; text-align: center; padding: 1rem; }
+    </style>
+    """, unsafe_allow_html=True)
+    st.markdown("<div class='public-hero'><h1>Singelo Gesto</h1><p>Presentes pensados para transformar momentos importantes em lembrancas especiais.</p></div>", unsafe_allow_html=True)
+    st.markdown("### Escolha uma ocasiao")
+    options = ["Todas"] + categories
+    current = category if category in options else "Todas"
+    selected = st.selectbox("Categoria do catalogo", options, index=options.index(current), label_visibility="collapsed")
+    if selected != current:
+        try:
+            st.query_params["catalogo"] = "publico"
+            st.query_params["categoria"] = selected
+            st.rerun()
+        except Exception:
+            pass
+    products = buscar_catalogo_publico(supabase, selected)
+    if not products:
+        st.markdown("<div class='public-note'>Estamos preparando novas opcoes para esta categoria.</div>", unsafe_allow_html=True)
+        return
+    title = "Nossas opcoes" if selected == "Todas" else f"Boxes de {selected}"
+    st.markdown(f"### {title}")
+    st.caption("Escolha uma opcao e fale conosco para confirmar disponibilidade, personalizacao e entrega.")
+    for start in range(0, len(products), 3):
+        columns = st.columns(3)
+        for column, product in zip(columns, products[start:start + 3]):
+            with column:
+                with st.container(border=True):
+                    if product.get("image_url"):
+                        st.image(product["image_url"], use_container_width=True)
+                    st.markdown(f"### {product.get('title', 'Produto')}")
+                    description = product.get("description", "")
+                    if len(description) > 260:
+                        description = description[:257].rstrip() + "..."
+                    st.write(description)
+                    price = product.get("price")
+                    price_text = "Consulte o valor" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    st.markdown(f"**{price_text}**")
+                    message = f"Ola! Vi o catalogo da Singelo Gesto e gostaria de saber mais sobre: {product.get('title', 'produto')}."
+                    st.link_button("Quero esta opcao", whatsapp_url("27998622049", message), use_container_width=True)
+    st.markdown("---")
+    st.markdown("<div class='public-note'>Atendimento e entregas na Grande Vitoria. Personalizamos cada presente com carinho.</div>", unsafe_allow_html=True)
+
+
+def render_catalogo_instagram(supabase):
+    """Importa produtos por links, salva no banco e prepara o catalogo publico."""
+    st.markdown("## Catalogo Instagram e WhatsApp")
+    st.caption("Importe os links publicos e publique um catalogo organizado por categoria.")
     with st.sidebar:
         st.markdown("### Links das publicacoes")
         default_links = """https://www.instagram.com/p/DRLdkR3EZqE/?img_index=1
@@ -1164,46 +1261,49 @@ https://www.instagram.com/p/DdFU9zikaSP/?img_index=1
 https://www.instagram.com/p/DdFUV3YEWNW/?img_index=1
 https://www.instagram.com/p/DdFTtXDkRmD/?img_index=1"""
         links = st.text_area("Links do Instagram", value=default_links, height=220, key="catalog_links")
-        phone = st.text_input("WhatsApp do cliente", placeholder="(27) 99999-9999", key="catalog_phone")
-        importar = st.button("Importar links", type="primary", use_container_width=True, key="catalog_import_links")
+        importar = st.button("Importar e salvar produtos", type="primary", use_container_width=True, key="catalog_import_links")
         st.caption("Nao e necessario informar a senha do Instagram.")
     if importar:
         with st.spinner("Lendo publicacoes, precos e fotos..."):
             try:
-                st.session_state.catalog_products = collect_post_links(links)
-                st.success(f"{len(st.session_state.catalog_products)} publicacao(oes) importada(s).")
+                products = collect_post_links(links)
+                salvar_catalogo_instagram(supabase, products)
+                st.session_state.catalog_products = products
+                st.success(f"{len(products)} produto(s) importado(s) e salvo(s).")
             except Exception as exc:
-                st.error(f"Nao foi possivel importar: {exc}")
-                st.info("Verifique se os links sao publicos e estao completos.")
-    products = st.session_state.get("catalog_products", [])
+                st.error(f"Nao foi possivel importar e salvar: {exc}")
+                st.info("Execute o arquivo criar_tabela_catalogo_instagram.sql no SQL Editor do Supabase.")
+    try:
+        products = buscar_catalogo_publico(supabase)
+    except Exception:
+        products = st.session_state.get("catalog_products", [])
+        st.warning("A tabela do catalogo ainda nao esta criada. Execute o SQL fornecido no projeto.")
     if not products:
         st.info("Cole os links no painel lateral para iniciar.")
         return
-    search = st.text_input("Buscar produto ou categoria", placeholder="Ex.: aniversario, cafe, caneca", key="catalog_search")
-    query = search.lower().strip()
-    filtered = [item for item in products if not query or query in (item.get("title", "") + " " + item.get("category", "") + " " + item.get("description", "")).lower()]
-    st.write(f"{len(filtered)} produto(s) encontrado(s)")
-    for index, product in enumerate(filtered):
-        title = product.get("title", "Produto")
-        price = product.get("price")
-        price_text = "Consultar valor" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        with st.expander(f"{title} | {price_text}", expanded=index == 0):
+    st.markdown("### Produtos salvos")
+    st.write(f"{len(products)} produto(s) disponivel(is) no catalogo.")
+    public_base = st.text_input("Endereco publicado do sistema", "https://brfoyobozvbmtj76aafaed.streamlit.app", key="catalog_public_base")
+    categories = sorted({item.get("category", "Outros") for item in products})
+    st.markdown("### Links para enviar aos clientes")
+    for category in categories:
+        link = f"{public_base.rstrip('/')}/?catalogo=publico&categoria={quote(category)}"
+        st.code(link)
+        st.caption(f"Catalogo de {category}")
+    st.markdown("### Revisao rapida")
+    for index, product in enumerate(products):
+        with st.expander(f"{product.get('title', 'Produto')} | {product.get('category', 'Outros')}"):
             col_image, col_data = st.columns([1, 2])
             with col_image:
                 if product.get("image_url"): st.image(product["image_url"], use_container_width=True)
-                else: st.info("Sem imagem")
             with col_data:
-                product["title"] = st.text_input("Nome do produto", title, key=f"catalog_title_{index}")
-                categories = ["Cafe da manha", "Aniversario", "Maternidade", "Casamento e noivado", "Flores e mimos", "Datas especiais", "Outros"]
-                current = product.get("category", "Outros")
-                product["category"] = st.selectbox("Categoria", categories, index=categories.index(current) if current in categories else 6, key=f"catalog_category_{index}")
-                product["price"] = st.number_input("Preco (R$)", min_value=0.0, value=float(price or 0), step=0.01, key=f"catalog_price_{index}") or None
-                product["description"] = st.text_area("Descricao", product.get("description", ""), height=130, key=f"catalog_description_{index}")
-                if product.get("image_url"):
-                    st.link_button("Abrir foto para anexar", product["image_url"], use_container_width=True)
-                st.link_button("Abrir mensagem no WhatsApp", whatsapp_url(phone, product_message(product)), use_container_width=True)
-                if product.get("permalink"): st.link_button("Ver publicacao no Instagram", product["permalink"], use_container_width=True)
-    st.download_button("Baixar catalogo revisado", data=__import__("json").dumps(products, ensure_ascii=False, indent=2, default=str), file_name="catalogo_singelo_gesto.json", mime="application/json", use_container_width=True)
+                st.write(product.get("description", ""))
+                price = product.get("price")
+                price_text = "Consultar valor" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                st.markdown(f"**{price_text}**")
+                if product.get("permalink"):
+                    st.link_button("Ver publicacao no Instagram", product["permalink"], use_container_width=True)
+
 
 # ==================== INTERFACE PRINCIPAL ====================
 def main():
@@ -1240,7 +1340,14 @@ def main():
         st.error(f"❌ Erro ao conectar com Supabase: {str(e)}")
         return
     
-    # Sidebar - Menu
+    try:
+        public_catalog = st.query_params.get("catalogo") == "publico"
+    except Exception:
+        public_catalog = False
+    if public_catalog:
+        render_catalogo_publico(supabase)
+        return
+        # Sidebar - Menu
     with st.sidebar:
         st.markdown("### 📊 Menu Principal")
         opcao = st.radio(
@@ -1256,7 +1363,7 @@ def main():
     
     # ==================== CATALOGO INSTAGRAM ====================
     if opcao == "📦 Catalogo Instagram":
-        render_catalogo_instagram()
+        render_catalogo_instagram(supabase)
 
     # ==================== DASHBOARD ====================
     elif opcao == "📈 Dashboard":
