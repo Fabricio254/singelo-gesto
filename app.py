@@ -1435,11 +1435,11 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
         return
     st.markdown("### Produtos salvos")
     st.write(f"{len(products)} produto(s) disponivel(is) no catalogo.")
-    public_base = st.text_input("Endereco publicado do sistema", "https://brfoyobozvbmtj76aafaed.streamlit.app", key="catalog_public_base")
+    public_base = st.text_input("Endereco publicado do catalogo", "https://fabricio254.github.io/singelo-gesto/catalogo/", key="catalog_public_base")
     categories = sorted({item.get("category", "Outros") for item in products})
     st.markdown("### Links para enviar aos clientes")
     for category in categories:
-        link = f"{public_base.rstrip('/')}/?catalogo=publico&categoria={quote(category)}"
+        link = f"{public_base.rstrip('/')}/?categoria={quote(category)}"
         st.code(link)
         st.caption(f"Catalogo de {category}")
     st.markdown("### Revisao e valores")
