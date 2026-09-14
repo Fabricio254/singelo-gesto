@@ -147,11 +147,36 @@ def whatsapp_url(phone: str, message: str) -> str:
     digits = re.sub(r"\D", "", phone or "")
     return f"https://wa.me/{digits}?text={quote(message)}" if digits else f"https://wa.me/?text={quote(message)}"
 
+def clean_whatsapp_text(text: str, limit: Optional[int] = None) -> str:
+    text = clean_caption(text)
+    text = text.replace("�", "")
+    text = re.sub(r"[\uFFFD\x00-\x08\x0b\x0c\x0e-\x1f]+", "", text)
+    text = re.sub(r"^[^\w\dA-Za-zÀ-ÿ]+$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    if limit and len(text) > limit:
+        text = text[:limit].rstrip(" ,.;:-") + "..."
+    return text
+
+
 def product_message(product: Dict[str, Any]) -> str:
-    title = clean_caption(product.get("title", "Produto"))
-    category = clean_caption(product.get("category", ""))
-    description = clean_caption(product.get("description", ""))
+    title = clean_whatsapp_text(product.get("title", "Produto")) or "Produto"
+    category = clean_whatsapp_text(product.get("category", ""))
+    description = clean_whatsapp_text(product.get("description", ""), limit=300)
+    permalink = clean_whatsapp_text(product.get("permalink", ""))
     price = product.get("price")
     price_text = "Consulte o valor e a disponibilidade" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    lines = ["Ola! Tudo bem?", "", "Separei esta opcao da Singelo Gesto para voce:", "", f"Produto: {title}", f"Categoria: {category}", f"Valor: {price_text}", "", "Detalhes:", description, "", "Para reservar, me diga a data e a cidade da entrega."]
+    lines = [
+        "Ola! Tudo bem?",
+        "",
+        "Tenho interesse nesta opcao da Singelo Gesto:",
+        "",
+        f"Produto: {title}",
+        f"Categoria: {category}",
+        f"Valor: {price_text}",
+    ]
+    if permalink:
+        lines.extend(["", "Link do produto:", permalink])
+    if description:
+        lines.extend(["", "Detalhes:", description])
+    lines.extend(["", "Para reservar, me diga a data e a cidade da entrega."])
     return "\n".join(lines).strip()
