@@ -1,0 +1,25 @@
+const SUPABASE_URL="https://fjgugglxqyhlyxwzvdts.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqZ3VnZ2x4cXlobHl4d3p2ZHRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzODI4NzQsImV4cCI6MjA3NTk1ODg3NH0.YGQIfxghu4yK58iVoklI1YkwwH6aoprZ06LUsWzcYPk";
+const WHATSAPP_PHONE="5527998622049";
+const CATEGORY_ALIAS={"Casamento e noivado":["Casamento e noivado","Flores e mimos"]};
+let products=[];
+let selectedCategory=new URLSearchParams(window.location.search).get("categoria")||"Todas";
+const productsEl=document.querySelector("#products");
+const statusEl=document.querySelector("#status");
+const filters=[...document.querySelectorAll(".filter")];
+function normalizeText(value=""){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[\uFFFD\u0000-\u001f]/g,"").replace(/[^A-Za-z0-9\s:/?&=._,%+@#()\-]/g,"").replace(/[ \t]+/g," ").replace(/ *\n */g,"\n").trim()}
+function stripPrices(text=""){return String(text||"").replace(/(?:R\$\s*|rs\.?\s*|\$\s*)?\d{1,3}(?:\.\d{3})*,\d{2}|(?:R\$\s*|rs\.?\s*|\$\s*)?\d{2,4},\d{2}/gi,"").replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim()}
+function truncate(text,max=300){const clean=normalizeText(stripPrices(text));return clean.length>max?clean.slice(0,max).replace(/[ ,.;:-]+$/,"")+"...":clean}
+function money(value){if(value===null||value===undefined||value==="")return"Consulte o valor";const number=Number(value);if(!Number.isFinite(number)||number<=0)return"Consulte o valor";return number.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}
+function imageFor(product){if(product.image_url)return product.image_url;if(Array.isArray(product.image_urls)&&product.image_urls.length)return product.image_urls[0];if(product.permalink)return`${product.permalink.replace(/\/$/,"")}/media/?size=l`;return""}
+function messageFor(product){const title=normalizeText(product.title||"Produto");const category=normalizeText(product.category||"");const details=truncate(product.description||"",300);const price=money(product.price);const lines=["Ola! Tudo bem?","","Tenho interesse nesta opcao da Singelo Gesto:","",`Produto: ${title}`,`Categoria: ${category}`,`Valor: ${price}`];if(product.permalink)lines.push("","Link do produto:",product.permalink);if(details)lines.push("","Detalhes:",details);lines.push("","Para reservar, me diga a data e a cidade da entrega.");return lines.join("\n")}
+function whatsappUrl(product){return`https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(messageFor(product))}`}
+function categoriesForFilter(category){return CATEGORY_ALIAS[category]||[category]}
+function filteredProducts(){if(selectedCategory==="Todas")return products;const accepted=categoriesForFilter(selectedCategory);return products.filter(product=>accepted.includes(product.category))}
+function escapeHtml(value=""){return String(value).replace(/[&<>"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char]))}
+function escapeAttr(value=""){return escapeHtml(value).replace(/'/g,"&#39;")}
+function render(){filters.forEach(button=>button.classList.toggle("active",button.dataset.category===selectedCategory));const list=filteredProducts();statusEl.textContent=list.length?`${list.length} opcao(oes) encontrada(s)`:"Nenhuma opcao ativa nesta ocasiao.";productsEl.innerHTML=list.map(product=>{const description=truncate(product.description||"",190);const image=imageFor(product);return`<article class="card">${image?`<img class="card-image" src="${escapeAttr(image)}" alt="${escapeAttr(product.title||"Produto Singelo Gesto")}" loading="lazy">`:`<div class="card-image" role="img" aria-label="Produto sem foto"></div>`}<div class="card-body"><h3>${escapeHtml(normalizeText(product.title||"Produto"))}</h3>${description?`<p class="description">${escapeHtml(description)}</p>`:""}<div class="meta"><span class="price">${escapeHtml(money(product.price))}</span><span class="category">${escapeHtml(normalizeText(product.category||""))}</span></div><a class="product-button" href="${escapeAttr(whatsappUrl(product))}" target="_blank" rel="noopener">Quero esta opcao</a></div></article>`}).join("")}
+async function loadProducts(){const fields="id,title,category,description,price,image_url,image_urls,permalink,active";const response=await fetch(`${SUPABASE_URL}/rest/v1/singelo_catalogo_instagram?select=${fields}&active=eq.true&order=category.asc,title.asc`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});if(!response.ok)throw new Error("Nao foi possivel carregar o catalogo.");products=await response.json();render()}
+filters.forEach(button=>{button.addEventListener("click",()=>{selectedCategory=button.dataset.category;const url=new URL(window.location.href);if(selectedCategory==="Todas")url.searchParams.delete("categoria");else url.searchParams.set("categoria",selectedCategory);history.replaceState(null,"",url);render()})});
+if(!filters.some(button=>button.dataset.category===selectedCategory))selectedCategory="Todas";
+loadProducts().catch(error=>{statusEl.textContent=error.message||"Erro ao carregar catalogo."});

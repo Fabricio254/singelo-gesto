@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catalogo Singelo Gesto</title>
+  <meta name="description" content="Catalogo de presentes personalizados da Singelo Gesto.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">SG</div>
+      <div>
+        <p class="eyebrow">Singelo Gesto</p>
+        <h1>Catalogo de presentes</h1>
+      </div>
+    </div>
+    <a class="header-whatsapp" href="https://wa.me/5527998622049" target="_blank" rel="noopener">WhatsApp</a>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="intro-title">
+      <div>
+        <h2 id="intro-title">Escolha uma opcao especial</h2>
+        <p>Presentes personalizados para transformar carinho em lembranca. Selecione uma ocasiao e fale conosco pelo WhatsApp.</p>
+      </div>
+    </section>
+    <nav class="filters" aria-label="Categorias do catalogo">
+      <button class="filter active" data-category="Todas">Todas</button>
+      <button class="filter" data-category="Aniversario">Aniversario</button>
+      <button class="filter" data-category="Cafe da manha">Cafe da manha</button>
+      <button class="filter" data-category="Maternidade">Maternidade</button>
+      <button class="filter" data-category="Casamento e noivado">Casamento e noivado</button>
+      <button class="filter" data-category="Flores e mimos">Flores e mimos</button>
+      <button class="filter" data-category="Datas especiais">Datas especiais</button>
+    </nav>
+    <section class="status" id="status" role="status">Carregando catalogo...</section>
+    <section class="grid" id="products" aria-live="polite"></section>
+  </main>
+  <footer>
+    <p>Atendimento e entregas na Grande Vitoria. Consulte disponibilidade, personalizacao e taxa de entrega.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
