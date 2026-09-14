@@ -1,6 +1,7 @@
 """Coleta de produtos do Instagram por links publicos."""
 from __future__ import annotations
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -148,10 +149,31 @@ def whatsapp_url(phone: str, message: str) -> str:
     return f"https://wa.me/{digits}?text={quote(message)}" if digits else f"https://wa.me/?text={quote(message)}"
 
 def clean_whatsapp_text(text: str, limit: Optional[int] = None) -> str:
-    text = clean_caption(text)
-    text = text.replace("�", "")
-    text = re.sub(r"[\uFFFD\x00-\x08\x0b\x0c\x0e-\x1f]+", "", text)
-    text = re.sub(r"^[^\w\dA-Za-zÀ-ÿ]+$", "", text, flags=re.MULTILINE)
+    text = clean_caption(str(text or ""))
+    cleaned = []
+    for char in text:
+        if char in "\r\n":
+            cleaned.append("\n")
+            continue
+        if char == "\t":
+            cleaned.append(" ")
+            continue
+        if ord(char) == 0xFFFD:
+            continue
+        category = unicodedata.category(char)
+        if category[0] == "C" or category in {"So", "Sk"}:
+            continue
+        cleaned.append(char)
+
+    text = "".join(cleaned)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    lines = []
+    for line in text.splitlines():
+        line = line.strip(" -.,;:!|")
+        if line and any(char.isalnum() for char in line):
+            lines.append(line)
+    text = "\n".join(lines)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if limit and len(text) > limit:
         text = text[:limit].rstrip(" ,.;:-") + "..."
