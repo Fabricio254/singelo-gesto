@@ -7,7 +7,7 @@ from urllib.parse import quote
 import requests
 
 PRICE_RE = re.compile(r"(?:R\$\s*|rs\.?\s*|\$\s*|💲\s*)(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)", re.IGNORECASE)
-POST_URL_RE = re.compile(r"https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/[A-Za-z0-9_-]+/?(?:\?[^\s]*)?", re.IGNORECASE)
+POST_URL_RE = re.compile(r"https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?(?:\?[^\s]*)?", re.IGNORECASE)
 
 def parse_brl(value: str) -> float:
     return float(value.replace(".", "").replace(",", "."))
@@ -19,11 +19,22 @@ def extract_prices(caption: str) -> List[float]:
         except ValueError: pass
     return prices
 
+def shortcode_from_url(url: str) -> str:
+    match = POST_URL_RE.search(url or "")
+    return match.group(1) if match else ""
+
+
+def normalized_post_url(shortcode: str) -> str:
+    return f"https://www.instagram.com/p/{shortcode}/"
+
+
 def extract_post_urls(text: str) -> List[str]:
     found = []
-    for url in POST_URL_RE.findall(text or ""):
-        clean = url.rstrip(".,);]")
-        if clean not in found: found.append(clean)
+    for match in POST_URL_RE.finditer(text or ""):
+        shortcode = match.group(1)
+        clean = normalized_post_url(shortcode)
+        if clean not in found:
+            found.append(clean)
     return found
 
 def clean_caption(text: str) -> str:
@@ -59,28 +70,64 @@ def media_to_product(media: Any, username: str = "singelo_gesto") -> Dict[str, A
         if resource_url and resource_url not in image_urls: image_urls.append(resource_url)
     return {"instagram_id": str(getattr(media, "pk", "")), "username": username, "title": title_from_caption(caption), "category": guess_category(caption), "description": caption, "price": prices[-1] if prices else None, "prices_found": prices, "image_url": image_urls[0] if image_urls else None, "image_urls": image_urls, "permalink": f"https://www.instagram.com/p/{shortcode}/" if shortcode else "", "taken_at": getattr(media, "taken_at", None)}
 
-def collect_post_links(text: str, username: str = "singelo_gesto") -> List[Dict[str, Any]]:
+def fallback_product_from_link(link: str, username: str = "singelo_gesto", error: str = "") -> Dict[str, Any]:
+    shortcode = shortcode_from_url(link)
+    permalink = normalized_post_url(shortcode) if shortcode else link.split("?")[0]
+    return {
+        "instagram_id": shortcode or permalink,
+        "username": username,
+        "title": "Produto do Instagram",
+        "category": "Outros",
+        "description": "",
+        "price": None,
+        "prices_found": [],
+        "image_url": f"https://www.instagram.com/p/{shortcode}/media/?size=l" if shortcode else None,
+        "image_urls": [f"https://www.instagram.com/p/{shortcode}/media/?size=l"] if shortcode else [],
+        "permalink": permalink,
+        "taken_at": None,
+        "_import_error": error,
+    }
+
+def collect_post_links_manual(text: str, username: str = "singelo_gesto", progress_callback=None) -> List[Dict[str, Any]]:
+    links = extract_post_urls(text)
+    if not links:
+        raise ValueError("Nenhum link publico do Instagram foi encontrado.")
+    products = []
+    for index, link in enumerate(links, start=1):
+        if progress_callback:
+            progress_callback(index, len(links), link, "manual")
+        products.append(fallback_product_from_link(link, username, "Cadastro rapido por link"))
+    return products
+
+
+def collect_post_links(text: str, username: str = "singelo_gesto", progress_callback=None) -> List[Dict[str, Any]]:
     try:
         from instagrapi import Client
     except ImportError as exc:
         raise RuntimeError("A dependencia instagrapi nao esta instalada. Execute pip install -r requirements.txt.") from exc
     links = extract_post_urls(text)
-    if not links: raise ValueError("Nenhum link publico do Instagram foi encontrado.")
+    if not links:
+        raise ValueError("Nenhum link publico do Instagram foi encontrado.")
     client = Client()
     products = []
-    errors = []
-    for link in links:
+    for index, link in enumerate(links, start=1):
+        if progress_callback:
+            progress_callback(index, len(links), link, "lendo")
         try:
             media_pk = client.media_pk_from_url(link)
-            try: media = client.media_info_gql(media_pk)
-            except Exception: media = client.media_info(media_pk)
+            try:
+                media = client.media_info_gql(media_pk)
+            except Exception:
+                media = client.media_info(media_pk)
             product = media_to_product(media, username)
-            product["permalink"] = link.split("?")[0]
+            product["permalink"] = link
             products.append(product)
+            if progress_callback:
+                progress_callback(index, len(links), link, "ok")
         except Exception as exc:
-            errors.append(f"{link}: {exc}")
-    if not products:
-        raise RuntimeError("Nenhuma publicacao foi lida. " + " | ".join(errors[:3]))
+            products.append(fallback_product_from_link(link, username, str(exc)))
+            if progress_callback:
+                progress_callback(index, len(links), link, "manual")
     return products
 
 def collect_profile(username: str, password: str, amount: int = 0, session_file: Optional[str] = None) -> List[Dict[str, Any]]:

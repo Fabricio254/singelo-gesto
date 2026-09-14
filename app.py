@@ -6,7 +6,7 @@ from PIL import Image
 import xml.etree.ElementTree as ET
 import requests
 import re
-from Instagram import collect_post_links, product_message, whatsapp_url
+from Instagram import collect_post_links, collect_post_links_manual, product_message, whatsapp_url
 from urllib.parse import quote
 
 # ==================== CONFIGURAÇÕES ====================
@@ -1152,6 +1152,16 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
 
 
 
+CATALOG_CATEGORIES = [
+    "Aniversario",
+    "Cafe da manha",
+    "Maternidade",
+    "Casamento e noivado",
+    "Flores e mimos",
+    "Datas especiais",
+    "Outros",
+]
+
 def salvar_catalogo_instagram(supabase, products):
     """Salva ou atualiza os produtos importados no banco."""
     payload = []
@@ -1176,8 +1186,21 @@ def salvar_catalogo_instagram(supabase, products):
 def buscar_catalogo_publico(supabase, category=None):
     query = supabase.table("singelo_catalogo_instagram").select("*").eq("active", True).order("category").order("title")
     if category and category != "Todas":
-        query = query.eq("category", category)
+        if category == "Casamento e noivado":
+            query = query.in_("category", ["Casamento e noivado", "Flores e mimos"])
+        else:
+            query = query.eq("category", category)
     return query.execute().data or []
+
+
+def buscar_catalogo_admin(supabase):
+    """Busca todos os produtos do catalogo para revisao interna."""
+    return supabase.table("singelo_catalogo_instagram").select("*").order("category").order("title").execute().data or []
+
+
+def salvar_edicao_catalogo(supabase, product_id, data):
+    """Atualiza campos editaveis de um produto do catalogo."""
+    return supabase.table("singelo_catalogo_instagram").update(data).eq("id", product_id).execute()
 
 
 def render_catalogo_publico(supabase):
@@ -1241,7 +1264,7 @@ def render_catalogo_publico(supabase):
                     price = product.get("price")
                     price_text = "Consulte o valor" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                     st.markdown(f"**{price_text}**")
-                    message = f"Ola! Vi o catalogo da Singelo Gesto e gostaria de saber mais sobre: {product.get('title', 'produto')}."
+                    message = product_message(product)
                     st.link_button("Quero esta opcao", whatsapp_url("27998622049", message), use_container_width=True)
     st.markdown("---")
     st.markdown("<div class='public-note'>Atendimento e entregas na Grande Vitoria. Personalizamos cada presente com carinho.</div>", unsafe_allow_html=True)
@@ -1253,28 +1276,157 @@ def render_catalogo_instagram(supabase):
     st.caption("Importe os links publicos e publique um catalogo organizado por categoria.")
     with st.sidebar:
         st.markdown("### Links das publicacoes")
-        default_links = """https://www.instagram.com/p/DRLdkR3EZqE/?img_index=1
-https://www.instagram.com/p/DMtVKcJPniV/?img_index=1
-https://www.instagram.com/p/DDfu-2FEtKx/?img_index=1
-https://www.instagram.com/p/DDfuugq9kchk/?img_index=1
-https://www.instagram.com/p/DdFU9zikaSP/?img_index=1
-https://www.instagram.com/p/DdFUV3YEWNW/?img_index=1
-https://www.instagram.com/p/DdFTtXDkRmD/?img_index=1"""
+        default_links = """https://www.instagram.com/p/DdFU9zikaSP/?stkn=MW1wZHZic3Z1OHFncQ==
+https://www.instagram.com/p/DdFuug9kchk/?stkn=MWRreTF1eThpeWR1cA==
+https://www.instagram.com/p/DcGt_p0kYrx/?stkn=cmtweW5keWM1eTk3
+https://www.instagram.com/p/DbW9tHZEavv/?stkn=MWcybjE3b3R0c3h6Mg==
+https://www.instagram.com/p/DbW9I6pkZt8/?stkn=MXF5MTQyZHpneTJmNw==
+https://www.instagram.com/p/DbW8lxHkV8W/?stkn=MWp5Mzh6bjI3czFiYw==
+https://www.instagram.com/p/DbBQpZbkQIG/?stkn=MWVtMXlvejdzaGFhaA==
+https://www.instagram.com/p/DbBMbO_kZd7/?stkn=MTQ5cXdrd3N4ZTN2MA==
+https://www.instagram.com/p/DbBL_8QkfOM/?stkn=MTVkMGZjY3JqY2N1dw==
+https://www.instagram.com/p/DbBLl2IkUJi/?stkn=MWczaGY1Y3U1OTQyYw==
+https://www.instagram.com/p/DbBLEGTEaG6/?stkn=MWpzeXJqMzQ1ZWVqdQ==
+https://www.instagram.com/p/DbBKf3vkWMr/?stkn=eGhxemdkY2xqaXdu
+https://www.instagram.com/p/DbBJmHiEa61/?stkn=MTJzdGNybjZtZGpqMg==
+https://www.instagram.com/p/DbBIvA3EVl2/?stkn=a2Nua2ZxdGZzdmYy
+https://www.instagram.com/p/DbBIdYtkUO2/?stkn=dHhqdWJ3MTk1NTZm
+https://www.instagram.com/p/DbBHwDvEcxN/?stkn=MTBkOXFkbDU0bXhpYw==
+https://www.instagram.com/p/DbBHblwkYvg/?stkn=Z2Q3cGtkanZmbDVz
+https://www.instagram.com/p/Dafj6NeACXm/?stkn=cm5hbTU0MHJhNmg=
+https://www.instagram.com/p/DaDu5qDkf1D/?stkn=eWUzZ2FwNXE0aGVn
+https://www.instagram.com/p/DZ3oK-5ETju/?stkn=MXhuNHhibGtrd3VkcA==
+https://www.instagram.com/p/DZ3nJerEV-/?stkn=MXNpbGJndHJlYXR4Ng==
+https://www.instagram.com/p/DZ2TsOJkSuo/?stkn=ZHpoa3c3bnU5Y3R4
+https://www.instagram.com/p/DZG9x3PkeoY/?stkn=eHZibDA0Z3ExOXU=
+https://www.instagram.com/p/DZG9DoHETe3/?stkn=Y3o2cW9sMW52ODlo
+https://www.instagram.com/p/DZGzL9PEVCg/?stkn=d3E2ZXNmemt6Z201
+https://www.instagram.com/p/DZGyxuckRVX/?stkn=MXV3Y2l3ZmtrdHl5cg==
+https://www.instagram.com/p/DZGye5IEevi/?stkn=MzhzaGlwMWIzMWJ4
+https://www.instagram.com/p/DZGxVcHEYJD/?stkn=NmdpbHltNHczNHJi
+https://www.instagram.com/p/DZGxBYzETFq/?stkn=MXZkdHh5Z283MWY5eg==
+https://www.instagram.com/p/DWwBoqnkW_F/?stkn=emphemMzMzRlMGM0
+https://www.instagram.com/p/DWwBDjAEXLx/?stkn=cGJudGM0Z2hycGJ4
+https://www.instagram.com/p/DWwAi3GEdrz/?stkn=MXQ5OWRidGFjczhsbQ==
+https://www.instagram.com/p/DWwAQF1kcGN/?stkn=cHFxejBiN3RrMGMy
+https://www.instagram.com/p/DWv_zCzET7x/?stkn=NXJ5dmN1MDgyaW0x
+https://www.instagram.com/p/DWMPikAEe2X/?stkn=ZWV4aWVvbWRsNjI2
+https://www.instagram.com/p/DV_ExrZEaYQ/?stkn=MTN4YmVyeDhwb2xyYw==
+https://www.instagram.com/p/DVyMm1gETfP/?stkn=MWltOGIxaGwxeXU5cA==
+https://www.instagram.com/p/DVyMGDcEeHK/?stkn=MXR4MHoxdGF3ZDQ4eA==
+https://www.instagram.com/p/DVyLYaBEZXE/?stkn=MXhiamI0ajV0MHhnbA==
+https://www.instagram.com/p/DVyKn00kayf/?stkn=MWZhaXg2emptc2t3eg==
+https://www.instagram.com/p/DVZQvBRkcg7/?stkn=am0zdWxsY2w4cjhx
+https://www.instagram.com/p/DVYamnhkYRb/?stkn=bWZ1b2lobTJsb3c1
+https://www.instagram.com/p/DVYaDpKEYH8/?stkn=NmF3czNmYmtpZGZy
+https://www.instagram.com/p/DVYZm1yETKi/?stkn=MWhzbGZtMWE4cDAyMQ==
+https://www.instagram.com/p/DU8GhtWEeVG/?stkn=Zmcxd2dsdW4xamdn
+https://www.instagram.com/p/DUTNF-ZkQem/?stkn=eWVoOGIzYnJ4dGVy
+https://www.instagram.com/p/DUTM1j_ESgK/?stkn=MTByM3JmNnBoYWg5bw==
+https://www.instagram.com/p/DT0RPX6EZjB/?stkn=dzRicHQwN3Q1bTNr
+https://www.instagram.com/p/DT0QuqHEdPu/?stkn=dmg1ZWc0OXVveThw
+https://www.instagram.com/p/DT0QYAIEde4/?stkn=azljN2tuZjNwMXlu
+https://www.instagram.com/p/DT0QApgEVA7/?stkn=MTNpanlrcGdjcnd4cQ==
+https://www.instagram.com/p/DT0PrglEYhb/?stkn=MXIxMG5zYnRjNXNtZQ==
+https://www.instagram.com/p/DTtIMhGkVKX/?stkn=MWN5Y3I2ZmZieTNsMA==
+https://www.instagram.com/p/DTasYlfEUp2/?stkn=MTc2NWdnbWc5N2Rveg==
+https://www.instagram.com/p/DTaooPjkZpr/?stkn=NHhkMmdidnJ5ZW9j
+https://www.instagram.com/p/DTaoH1UETJi/?stkn=eWttZm5mcTUxcmZ0
+https://www.instagram.com/p/DTEe3Qdkajr/?stkn=cnE3emp6aHh6MHpm
+https://www.instagram.com/p/DTEZLBpkSnh/?stkn=NmNxbTZpemQ4Z2h1
+https://www.instagram.com/p/DS7giyWkUPc/?stkn=MWhkaWlkMjY2NHptYQ==
+https://www.instagram.com/p/DS2e1OGEUpU/?stkn=MWNyejczMnlrendjNg==
+https://www.instagram.com/p/DSz_iENEaAP/?stkn=MXVpYTNyMzhicGsyYg==
+https://www.instagram.com/p/DSz7WxUkSc-/?stkn=cWV0dDk2Znhtdm1u
+https://www.instagram.com/p/DRLc28GEQj/?stkn=emxwY3A5MTJkY3c1
+https://www.instagram.com/p/DRLcgwjEal1/?stkn=MXcydXhrOXRzYXJwMA==
+https://www.instagram.com/p/DRLb7mJEXJe/?stkn=bzNvbnc3cGt5OTM2
+https://www.instagram.com/p/DRLbV2SEWsA/?stkn=bTB6MjkyNnY3b2Fl
+https://www.instagram.com/p/DQqCdrrkezH/?stkn=MWs5ajk3emJrdjYxMQ==
+https://www.instagram.com/p/DQp_wY9kfRD/?stkn=Yjl4YnYzNG42NDFx
+https://www.instagram.com/p/DQp_QgjEfja/?stkn=MWYxb2Z6bnQ3eXVldw==
+https://www.instagram.com/p/DQp-2FpEdTc/?stkn=MTB0enJjdGRiaG1iOQ==
+https://www.instagram.com/p/DQp-XRSEcN8/?stkn=ZXQyd20zOGNkNmlk
+https://www.instagram.com/p/DQkqbacEYV4/?stkn=MWlqN2dhYjlxc3luYQ==
+https://www.instagram.com/p/DQkp5SpkcCq/?stkn=NHpkdXc5ejdqODgw
+https://www.instagram.com/p/DQkoKUrEWQO/?stkn=d2ZnaWV5Zzh5d3Zq
+https://www.instagram.com/p/DQknkRMEYhc/?stkn=MTI4MWRyODUybjM2Ng==
+https://www.instagram.com/p/DQkmyEXkazN/?stkn=OTZlZ2lnbXNnZjg=
+https://www.instagram.com/p/DQkmGcMEXSr/?stkn=MTY1eGdidDNveGwycg==
+https://www.instagram.com/p/DQkleOmkWrG/?stkn=bGtmcGdqMXhrdTB0
+https://www.instagram.com/p/DQkkoG2EeYZ/?stkn=MTQ3YzU4OGxwMzlhMA==
+https://www.instagram.com/p/DQkkNjJEcON/?stkn=NXVkbG51cGk5emN6
+https://www.instagram.com/p/DQkjk0qEbWJ/?stkn=MTB0dGpqdmRlc3dqaw==
+https://www.instagram.com/p/DQki2SakXk3/?stkn=MTJyMGE3MnRlNW4yYw==
+https://www.instagram.com/p/DPor4VakSH0/?stkn=ODRqZjV4aHdkdWl3
+https://www.instagram.com/p/DPZ2k3hEYR7/?stkn=Y3FxenhiY3FvaXFi
+https://www.instagram.com/p/DPZ0uuokZnF/?stkn=MWs4dHdwMDhkc3pxaA==
+https://www.instagram.com/p/DPZ0Q1skSmg/?stkn=MTA1MHJhbnIzNmszcQ==
+https://www.instagram.com/p/DPZz8UrkZ72/?stkn=MWJzZG0wcTRsd2hkMg==
+https://www.instagram.com/p/DOq6PB7kbNX/?stkn=anI3YWZqN3NodDRv
+https://www.instagram.com/p/DOq5MA3EZch/?stkn=czBobTZ3OHdxZWkx
+https://www.instagram.com/p/DOq40blkaru/?stkn=MXNvNWw2Z3ExcTBrag==
+https://www.instagram.com/p/DOq4XRdkWjm/?stkn=MWdpODF6cjB3ang4bA==
+https://www.instagram.com/p/DOmSmEYka8o/?stkn=bjc2MHY3ODUwamVy
+https://www.instagram.com/p/DOezeh7EaLm/?stkn=MW1jdnQ5ZHhvMzQwdQ==
+https://www.instagram.com/p/DOSHcqKkYgI/?stkn=MXh2djQwZzN0dzdjag==
+https://www.instagram.com/p/DOSG-paEQea/?stkn=MXR0bG5qcHNhbjJmZg==
+https://www.instagram.com/p/DNmD3Vws8c9/?stkn=MWpkd2YyeDJvcnpreg==
+https://www.instagram.com/p/DNWB5tbxP_d/?stkn=MWF6NDIzaGFna21iaw==
+https://www.instagram.com/p/DNWBbz2xrrl/?stkn=MW8yMHBqanU1b29yMA==
+https://www.instagram.com/p/DNQ2Ywrt4nR/?stkn=MWg5M2thazhoZjhrdg==
+https://www.instagram.com/p/DND20kMxggG/?stkn=MTBrc3FzdW9iMnBiaA==
+https://www.instagram.com/p/DM_v8u2N-LQ/?stkn=MWI0M2psM3Jma3BoOQ==
+https://www.instagram.com/p/DM-lDnqRjyd/?stkn=aGprbG4yeDZvYnhi
+https://www.instagram.com/p/DMtV-TPPZ80/?stkn=MWN4YTlibXMzZm5yMg==
+https://www.instagram.com/p/DMsS5GNRz3c/?stkn=MTluZ3owYW9mNTBoeA==
+https://www.instagram.com/p/DMNUasqsx3R/?stkn=dWR5bGhiNTBjNWJl
+https://www.instagram.com/p/DMNT_2yswyx/?stkn=b3poYXgxb2dvdTE1
+https://www.instagram.com/p/DMJmBb5t5k8/?stkn=dm1xNndndWlrY2Z5
+https://www.instagram.com/p/DMJk6Vxt2P7/?stkn=MWs0NGFpbGxpd3owMg==
+https://www.instagram.com/p/DMGBAueR_xu/?stkn=Zjkyc29sMzB6bm9s
+https://www.instagram.com/p/DLznQUwRGyR/?stkn=MTNnOWxxeGpybGV5aQ==
+https://www.instagram.com/p/DLVPMryxtvr/?stkn=MWo3Z240Nmg0ajFrMQ==
+https://www.instagram.com/p/DLVOkxKxeVd/?stkn=ZWo2cjF4cjh3ZGo0
+https://www.instagram.com/p/DLVOGN3Rqvh/?stkn=MW1lbXQ4ZDZ3azFlcw==
+https://www.instagram.com/p/DLVMFB6RlpX/?stkn=enpoYmI0OWR5ZnNo
+https://www.instagram.com/p/DLVLXOlxctT/?stkn=YW52MmR0ODN1NzRo
+https://www.instagram.com/p/DKsM9G2Pm_e/?stkn=b2l0YnBobmkwbTE3
+https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
         links = st.text_area("Links do Instagram", value=default_links, height=220, key="catalog_links")
+        buscar_dados = st.checkbox("Tentar buscar descricao e foto automaticamente", value=False, key="catalog_fetch_details")
         importar = st.button("Importar e salvar produtos", type="primary", use_container_width=True, key="catalog_import_links")
-        st.caption("Nao e necessario informar a senha do Instagram.")
+        st.caption("Sem marcar a busca automatica, o sistema cadastra os links rapidamente para voce revisar os valores.")
     if importar:
+        progress_bar = st.progress(0)
+        progress_text = st.empty()
+
+        def update_import_progress(current, total, link, status):
+            progress_bar.progress(current / total)
+            label = "lendo" if status == "lendo" else "pronto"
+            progress_text.caption(f"{current}/{total} {label}: {link}")
+
         with st.spinner("Lendo publicacoes, precos e fotos..."):
             try:
-                products = collect_post_links(links)
+                if buscar_dados:
+                    products = collect_post_links(links, progress_callback=update_import_progress)
+                else:
+                    products = collect_post_links_manual(links, progress_callback=update_import_progress)
                 salvar_catalogo_instagram(supabase, products)
                 st.session_state.catalog_products = products
-                st.success(f"{len(products)} produto(s) importado(s) e salvo(s).")
+                manual_count = sum(1 for product in products if product.get("_import_error"))
+                loaded_count = len(products) - manual_count
+                st.success(f"{len(products)} produto(s) salvo(s). {loaded_count} lido(s) automaticamente e {manual_count} para revisar manualmente.")
+                if manual_count:
+                    st.warning("Os produtos foram cadastrados pelos links. Ajuste titulo, valor, categoria e descricao em Revisao e valores.")
             except Exception as exc:
                 st.error(f"Nao foi possivel importar e salvar: {exc}")
-                st.info("Execute o arquivo criar_tabela_catalogo_instagram.sql no SQL Editor do Supabase.")
+                if "42501" in str(exc) or "row-level security" in str(exc).lower():
+                    st.info("Execute o arquivo corrigir_rls_catalogo_instagram.sql no SQL Editor do Supabase e tente importar novamente.")
+                else:
+                    st.info("Execute o arquivo criar_tabela_catalogo_instagram.sql no SQL Editor do Supabase.")
     try:
-        products = buscar_catalogo_publico(supabase)
+        products = buscar_catalogo_admin(supabase)
     except Exception:
         products = st.session_state.get("catalog_products", [])
         st.warning("A tabela do catalogo ainda nao esta criada. Execute o SQL fornecido no projeto.")
@@ -1290,17 +1442,51 @@ https://www.instagram.com/p/DdFTtXDkRmD/?img_index=1"""
         link = f"{public_base.rstrip('/')}/?catalogo=publico&categoria={quote(category)}"
         st.code(link)
         st.caption(f"Catalogo de {category}")
-    st.markdown("### Revisao rapida")
+    st.markdown("### Revisao e valores")
+    st.caption("A categoria escolhida aqui define em qual link publico o produto aparece.")
     for index, product in enumerate(products):
         with st.expander(f"{product.get('title', 'Produto')} | {product.get('category', 'Outros')}"):
             col_image, col_data = st.columns([1, 2])
             with col_image:
-                if product.get("image_url"): st.image(product["image_url"], use_container_width=True)
+                if product.get("image_url"):
+                    st.image(product["image_url"], use_container_width=True)
             with col_data:
-                st.write(product.get("description", ""))
-                price = product.get("price")
-                price_text = "Consultar valor" if price is None else f"R$ {float(price):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                st.markdown(f"**{price_text}**")
+                form_key = f"catalog_edit_{product.get('id', index)}"
+                with st.form(form_key):
+                    title = st.text_input("Titulo", value=product.get("title", "Produto"), key=f"{form_key}_title")
+                    current_category = product.get("category", "Outros") or "Outros"
+                    category_options = CATALOG_CATEGORIES if current_category in CATALOG_CATEGORIES else CATALOG_CATEGORIES + [current_category]
+                    category = st.selectbox(
+                        "Categoria",
+                        options=category_options,
+                        index=category_options.index(current_category),
+                        key=f"{form_key}_category",
+                    )
+                    price_value = product.get("price")
+                    price = st.number_input(
+                        "Valor",
+                        min_value=0.0,
+                        value=float(price_value) if price_value is not None else 0.0,
+                        step=1.0,
+                        format="%.2f",
+                        key=f"{form_key}_price",
+                    )
+                    description = st.text_area("Descricao", value=product.get("description", ""), height=120, key=f"{form_key}_description")
+                    active = st.checkbox("Mostrar no catalogo publico", value=bool(product.get("active", True)), key=f"{form_key}_active")
+                    salvar = st.form_submit_button("Salvar alteracoes", type="primary", use_container_width=True)
+                if salvar:
+                    try:
+                        salvar_edicao_catalogo(supabase, product.get("id"), {
+                            "title": title.strip() or "Produto",
+                            "category": category.strip() or "Outros",
+                            "description": description,
+                            "price": price,
+                            "active": active,
+                        })
+                        st.success("Produto atualizado.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Nao foi possivel salvar: {exc}")
                 if product.get("permalink"):
                     st.link_button("Ver publicacao no Instagram", product["permalink"], use_container_width=True)
 
