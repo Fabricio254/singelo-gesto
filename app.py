@@ -1435,7 +1435,7 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
         return
     st.markdown("### Produtos salvos")
     st.write(f"{len(products)} produto(s) disponivel(is) no catalogo.")
-    public_base = st.text_input("Endereco publicado do catalogo", "https://fabricio254.github.io/singelo-gesto/catalogo/", key="catalog_public_base")
+    public_base = st.text_input("Endereco publicado do catalogo", "https://www.singelogesto.com.br/catalogo/", key="catalog_public_base")
     categories = sorted({item.get("category", "Outros") for item in products})
     st.markdown("### Links para enviar aos clientes")
     for category in categories:
