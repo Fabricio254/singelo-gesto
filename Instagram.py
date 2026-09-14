@@ -150,26 +150,13 @@ def whatsapp_url(phone: str, message: str) -> str:
 
 def clean_whatsapp_text(text: str, limit: Optional[int] = None) -> str:
     text = clean_caption(str(text or ""))
-    cleaned = []
-    for char in text:
-        if char in "\r\n":
-            cleaned.append("\n")
-            continue
-        if char == "\t":
-            cleaned.append(" ")
-            continue
-        if ord(char) == 0xFFFD:
-            continue
-        category = unicodedata.category(char)
-        if category[0] == "C" or category in {"So", "Sk"}:
-            continue
-        cleaned.append(char)
-
-    text = "".join(cleaned)
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r" *\n *", "\n", text)
+    normalized = unicodedata.normalize("NFKD", text)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    ascii_text = re.sub(r"[^A-Za-z0-9\s:/?&=._,%+@#()\-]", "", ascii_text)
+    ascii_text = re.sub(r"[ \t]+", " ", ascii_text)
+    ascii_text = re.sub(r" *\n *", "\n", ascii_text)
     lines = []
-    for line in text.splitlines():
+    for line in ascii_text.splitlines():
         line = line.strip(" -.,;:!|")
         if line and any(char.isalnum() for char in line):
             lines.append(line)
