@@ -1163,24 +1163,41 @@ CATALOG_CATEGORIES = [
 ]
 
 def salvar_catalogo_instagram(supabase, products):
-    """Salva ou atualiza os produtos importados no banco."""
+    """Salva importacoes sem apagar dados quando o Instagram nao responde."""
+    products = [product for product in products if product.get("instagram_id")]
+    if not products:
+        return None
+
+    ids = [product["instagram_id"] for product in products]
+    existentes = {}
+    try:
+        rows = supabase.table("singelo_catalogo_instagram").select(
+            "instagram_id,title,category,description,price,image_url,image_urls,permalink,active"
+        ).in_("instagram_id", ids).execute().data or []
+        existentes = {row["instagram_id"]: row for row in rows}
+    except Exception:
+        # A importacao continua mesmo se a consulta de preservacao falhar.
+        existentes = {}
+
     payload = []
     for product in products:
+        anterior = existentes.get(product.get("instagram_id"), {})
+        price = product.get("price")
+        if price is None and anterior.get("price") is not None:
+            price = anterior["price"]
         payload.append({
             "instagram_id": product.get("instagram_id"),
-            "username": product.get("username", "singelo_gesto"),
-            "title": product.get("title", "Produto do Instagram"),
-            "category": product.get("category", "Outros"),
-            "description": product.get("description", ""),
-            "price": product.get("price"),
-            "image_url": product.get("image_url"),
-            "image_urls": product.get("image_urls", []),
-            "permalink": product.get("permalink", ""),
+            "username": product.get("username") or "singelo_gesto",
+            "title": product.get("title") or anterior.get("title") or "Produto do Instagram",
+            "category": product.get("category") or anterior.get("category") or "Outros",
+            "description": product.get("description") or anterior.get("description") or "",
+            "price": price,
+            "image_url": product.get("image_url") or anterior.get("image_url"),
+            "image_urls": product.get("image_urls") or anterior.get("image_urls") or [],
+            "permalink": product.get("permalink") or anterior.get("permalink") or "",
             "active": True,
         })
-    if payload:
-        return supabase.table("singelo_catalogo_instagram").upsert(payload, on_conflict="instagram_id").execute()
-    return None
+    return supabase.table("singelo_catalogo_instagram").upsert(payload, on_conflict="instagram_id").execute()
 
 
 def buscar_catalogo_publico(supabase, category=None):
