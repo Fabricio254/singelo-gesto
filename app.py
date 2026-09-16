@@ -1163,30 +1163,37 @@ CATALOG_CATEGORIES = [
 ]
 
 def salvar_catalogo_instagram(supabase, products):
-    """Salva importacoes sem apagar dados quando o Instagram nao responde."""
-    products = [product for product in products if product.get("instagram_id")]
+    """Salva importacoes e atualiza o registro existente pelo permalink."""
+    products = [product for product in products if product.get("instagram_id") or product.get("permalink")]
     if not products:
         return None
 
-    ids = [product["instagram_id"] for product in products]
+    def link_key(value):
+        return (value or "").split("?", 1)[0].rstrip("/").lower()
+
     existentes = {}
+    por_link = {}
     try:
         rows = supabase.table("singelo_catalogo_instagram").select(
             "instagram_id,title,category,description,price,image_url,image_urls,permalink,active"
-        ).in_("instagram_id", ids).execute().data or []
-        existentes = {row["instagram_id"]: row for row in rows}
+        ).execute().data or []
+        existentes = {row["instagram_id"]: row for row in rows if row.get("instagram_id")}
+        por_link = {link_key(row.get("permalink")): row for row in rows if row.get("permalink")}
     except Exception:
         # A importacao continua mesmo se a consulta de preservacao falhar.
-        existentes = {}
+        pass
 
     payload = []
     for product in products:
         anterior = existentes.get(product.get("instagram_id"), {})
+        if not anterior:
+            anterior = por_link.get(link_key(product.get("permalink")), {})
+        instagram_id = anterior.get("instagram_id") or product.get("instagram_id")
         price = product.get("price")
         if price is None and anterior.get("price") is not None:
             price = anterior["price"]
         payload.append({
-            "instagram_id": product.get("instagram_id"),
+            "instagram_id": instagram_id,
             "username": product.get("username") or "singelo_gesto",
             "title": product.get("title") or anterior.get("title") or "Produto do Instagram",
             "category": product.get("category") or anterior.get("category") or "Outros",
@@ -1198,7 +1205,6 @@ def salvar_catalogo_instagram(supabase, products):
             "active": True,
         })
     return supabase.table("singelo_catalogo_instagram").upsert(payload, on_conflict="instagram_id").execute()
-
 
 def buscar_catalogo_publico(supabase, category=None):
     query = supabase.table("singelo_catalogo_instagram").select("*").eq("active", True).order("category").order("title")
