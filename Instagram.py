@@ -80,7 +80,8 @@ def media_to_product(media: Any, username: str = "singelo_gesto") -> Dict[str, A
     for resource in getattr(media, "resources", []) or []:
         resource_url = _url_value(getattr(resource, "thumbnail_url", None))
         if resource_url and resource_url not in image_urls: image_urls.append(resource_url)
-    return {"instagram_id": shortcode or str(getattr(media, "pk", "")), "username": username, "title": title_from_caption(caption), "category": guess_category(caption), "description": caption, "price": prices[-1] if prices else None, "prices_found": prices, "image_url": image_urls[0] if image_urls else None, "image_urls": image_urls, "permalink": f"https://www.instagram.com/p/{shortcode}/" if shortcode else "", "taken_at": getattr(media, "taken_at", None)}
+        if len(image_urls) >= 4: break
+    return {"instagram_id": shortcode or str(getattr(media, "pk", "")), "username": username, "title": title_from_caption(caption), "category": guess_category(caption), "description": caption, "price": prices[-1] if prices else None, "prices_found": prices, "image_url": image_urls[0] if image_urls else None, "image_urls": image_urls[:4], "permalink": f"https://www.instagram.com/p/{shortcode}/" if shortcode else "", "taken_at": getattr(media, "taken_at", None)}
 
 def fallback_product_from_link(link: str, username: str = "singelo_gesto", error: str = "") -> Dict[str, Any]:
     shortcode = shortcode_from_url(link)
