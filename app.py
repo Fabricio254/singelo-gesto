@@ -1152,6 +1152,34 @@ def calcular_resumo(supabase: Client, data_inicio=None, data_fim=None):
 
 
 
+CATALOG_PRICE_RE = re.compile(r"(?:R\$\s*|rs\.?\s*|\$\s*|[\U0001f4b2\U0001f4b5\U0001f4b0\U0001f4b8]\ufe0f?\s*)(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)", re.IGNORECASE)
+CATALOG_PRICE_LINE_RE = re.compile(r"^\s*(?:[\U0001f4b2\U0001f4b5\U0001f4b0\U0001f4b8]\ufe0f?\s*)?(\d{2,4}(?:\.\d{3})*,\d{2})\s*$")
+
+
+def parse_catalog_price(value):
+    return float(str(value).replace(".", "").replace(",", "."))
+
+
+def extract_catalog_prices(text):
+    prices = []
+    text = str(text or "")
+    for match in CATALOG_PRICE_RE.finditer(text):
+        try:
+            prices.append(parse_catalog_price(match.group(1)))
+        except ValueError:
+            pass
+    for line in text.splitlines():
+        match = CATALOG_PRICE_LINE_RE.match(line)
+        if not match:
+            continue
+        try:
+            value = parse_catalog_price(match.group(1))
+        except ValueError:
+            continue
+        if value not in prices:
+            prices.append(value)
+    return prices
+
 CATALOG_CATEGORIES = [
     "Aniversario",
     "Cafe da manha",
@@ -1191,6 +1219,13 @@ def salvar_catalogo_instagram(supabase, products):
         instagram_id = anterior.get("instagram_id") or product.get("instagram_id")
         old_price = anterior.get("price")
         incoming_price = product.get("price")
+        if incoming_price is None:
+            imported_text = "\n".join(str(product.get(field) or "") for field in ("description", "title"))
+            prices_found = extract_catalog_prices(imported_text)
+            if prices_found:
+                incoming_price = prices_found[-1]
+                product["price"] = incoming_price
+                product["prices_found"] = prices_found
         price = incoming_price if incoming_price is not None else old_price
         if not anterior:
             status = "Novo"
