@@ -90,6 +90,11 @@ Ao adicionar produto novo:
 
 Os links sao normalizados removendo parametros stkn, mas o permalink publico deve continuar apontando para a publicacao original.
 
+## Relatorio de importacao
+
+Ao importar links pelo Streamlit, a rotina compara o valor salvo anteriormente com o valor lido na nova importacao. Depois do salvamento, mostra um resumo de valores atualizados, produtos novos, produtos sem alteracao, valores preservados quando o Instagram bloqueia a leitura e produtos sem preco lido.
+
+Os detalhes ficam em uma tabela expansivel com produto, permalink, situacao, valor antigo e valor novo. O relatorio pode ser baixado em CSV. Nao considerar um produto como atualizado quando ele estiver em "Nao lido - valor preservado"; nesse caso e necessario revisar ou tentar a leitura automatica novamente.
 ## WhatsApp
 
 O botao Quero esta opcao do catalogo HTML e do catalogo Streamlit abre o WhatsApp comercial da Singelo Gesto com uma mensagem contendo produto, categoria, valor, link da publicacao no Instagram, descricao curta e pedido de data e cidade de entrega.

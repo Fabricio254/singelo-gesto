@@ -1163,10 +1163,10 @@ CATALOG_CATEGORIES = [
 ]
 
 def salvar_catalogo_instagram(supabase, products):
-    """Salva importacoes e atualiza o registro existente pelo permalink."""
+    """Salva importacoes, atualiza pelo permalink e gera relatorio de precos."""
     products = [product for product in products if product.get("instagram_id") or product.get("permalink")]
     if not products:
-        return None
+        return {"response": None, "report": []}
 
     def link_key(value):
         return (value or "").split("?", 1)[0].rstrip("/").lower()
@@ -1180,18 +1180,35 @@ def salvar_catalogo_instagram(supabase, products):
         existentes = {row["instagram_id"]: row for row in rows if row.get("instagram_id")}
         por_link = {link_key(row.get("permalink")): row for row in rows if row.get("permalink")}
     except Exception:
-        # A importacao continua mesmo se a consulta de preservacao falhar.
         pass
 
     payload = []
+    report = []
     for product in products:
         anterior = existentes.get(product.get("instagram_id"), {})
         if not anterior:
             anterior = por_link.get(link_key(product.get("permalink")), {})
         instagram_id = anterior.get("instagram_id") or product.get("instagram_id")
-        price = product.get("price")
-        if price is None and anterior.get("price") is not None:
-            price = anterior["price"]
+        old_price = anterior.get("price")
+        incoming_price = product.get("price")
+        price = incoming_price if incoming_price is not None else old_price
+        if not anterior:
+            status = "Novo"
+        elif incoming_price is None and old_price is not None:
+            status = "Nao lido - valor preservado"
+        elif old_price != price:
+            status = "Valor atualizado"
+        elif price is None:
+            status = "Sem preco lido"
+        else:
+            status = "Sem alteracao"
+        report.append({
+            "Produto": product.get("title") or anterior.get("title") or "Produto do Instagram",
+            "Link": product.get("permalink") or anterior.get("permalink") or "",
+            "Situacao": status,
+            "Valor antigo": old_price,
+            "Valor novo": price,
+        })
         payload.append({
             "instagram_id": instagram_id,
             "username": product.get("username") or "singelo_gesto",
@@ -1204,7 +1221,8 @@ def salvar_catalogo_instagram(supabase, products):
             "permalink": product.get("permalink") or anterior.get("permalink") or "",
             "active": True,
         })
-    return supabase.table("singelo_catalogo_instagram").upsert(payload, on_conflict="instagram_id").execute()
+    response = supabase.table("singelo_catalogo_instagram").upsert(payload, on_conflict="instagram_id").execute()
+    return {"response": response, "report": report}
 
 def buscar_catalogo_publico(supabase, category=None):
     query = supabase.table("singelo_catalogo_instagram").select("*").eq("active", True).order("category").order("title")
@@ -1435,13 +1453,34 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
                     products = collect_post_links(links, progress_callback=update_import_progress)
                 else:
                     products = collect_post_links_manual(links, progress_callback=update_import_progress)
-                salvar_catalogo_instagram(supabase, products)
+                save_result = salvar_catalogo_instagram(supabase, products)
                 st.session_state.catalog_products = products
                 manual_count = sum(1 for product in products if product.get("_import_error"))
                 loaded_count = len(products) - manual_count
                 st.success(f"{len(products)} produto(s) salvo(s). {loaded_count} lido(s) automaticamente e {manual_count} para revisar manualmente.")
                 if manual_count:
                     st.warning("Os produtos foram cadastrados pelos links. Ajuste titulo, valor, categoria e descricao em Revisao e valores.")
+                report = save_result.get("report", []) if save_result else []
+                st.session_state.catalog_import_report = report
+                if report:
+                    updated_count = sum(1 for item in report if item["Situacao"] == "Valor atualizado")
+                    new_count = sum(1 for item in report if item["Situacao"] == "Novo")
+                    preserved_count = sum(1 for item in report if item["Situacao"] == "Nao lido - valor preservado")
+                    unchanged_count = sum(1 for item in report if item["Situacao"] == "Sem alteracao")
+                    missing_count = sum(1 for item in report if item["Situacao"] == "Sem preco lido")
+                    st.markdown("#### Relatorio da importacao")
+                    st.info(f"Atualizados: {updated_count} | Novos: {new_count} | Sem alteracao: {unchanged_count} | Valor preservado: {preserved_count} | Sem preco lido: {missing_count}")
+                    report_rows = []
+                    for item in report:
+                        row = dict(item)
+                        for field in ("Valor antigo", "Valor novo"):
+                            value = row[field]
+                            row[field] = "Consulte o valor" if value is None else f"R$ {float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                        report_rows.append(row)
+                    report_df = pd.DataFrame(report_rows)
+                    with st.expander("Ver detalhes dos valores", expanded=updated_count > 0):
+                        st.dataframe(report_df, use_container_width=True, hide_index=True)
+                        st.download_button("Baixar relatorio CSV", report_df.to_csv(index=False).encode("utf-8-sig"), "relatorio_importacao_catalogo.csv", "text/csv", key="download_catalog_import_report")
             except Exception as exc:
                 st.error(f"Nao foi possivel importar e salvar: {exc}")
                 if "42501" in str(exc) or "row-level security" in str(exc).lower():
