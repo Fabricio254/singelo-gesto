@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 import requests
 
-PRICE_RE = re.compile(r"(?:R\$\s*|rs\.?\s*|\$\s*|💲\s*)(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)", re.IGNORECASE)
+PRICE_RE = re.compile(r"(?:R\$\s*|rs\.?\s*|\$\s*|[💲💵💰💸]\ufe0f?\s*)(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)", re.IGNORECASE)
+PRICE_LINE_RE = re.compile(r"^\s*(?:[💲💵💰💸]\ufe0f?\s*)?(\d{2,4}(?:\.\d{3})*,\d{2})\s*$")
 POST_URL_RE = re.compile(r"https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?(?:\?[^\s]*)?", re.IGNORECASE)
 
 def parse_brl(value: str) -> float:
@@ -16,10 +17,20 @@ def parse_brl(value: str) -> float:
 def extract_prices(caption: str) -> List[float]:
     prices = []
     for match in PRICE_RE.finditer(caption or ""):
-        try: prices.append(parse_brl(match.group(1)))
-        except ValueError: pass
+        try:
+            prices.append(parse_brl(match.group(1)))
+        except ValueError:
+            pass
+    for line in clean_caption(caption).splitlines():
+        match = PRICE_LINE_RE.match(line)
+        if match:
+            try:
+                value = parse_brl(match.group(1))
+            except ValueError:
+                continue
+            if value not in prices:
+                prices.append(value)
     return prices
-
 def shortcode_from_url(url: str) -> str:
     match = POST_URL_RE.search(url or "")
     return match.group(1) if match else ""

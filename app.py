@@ -1224,6 +1224,32 @@ def salvar_catalogo_instagram(supabase, products):
     response = supabase.table("singelo_catalogo_instagram").upsert(payload, on_conflict="instagram_id").execute()
     return {"response": response, "report": report}
 
+def render_relatorio_importacao_catalogo(report):
+    """Mostra o ultimo relatorio de importacao do catalogo."""
+    if not report:
+        return
+
+    updated_count = sum(1 for item in report if item["Situacao"] == "Valor atualizado")
+    new_count = sum(1 for item in report if item["Situacao"] == "Novo")
+    preserved_count = sum(1 for item in report if item["Situacao"] == "Nao lido - valor preservado")
+    unchanged_count = sum(1 for item in report if item["Situacao"] == "Sem alteracao")
+    missing_count = sum(1 for item in report if item["Situacao"] == "Sem preco lido")
+    st.markdown("#### Relatorio da importacao")
+    st.info(f"Atualizados: {updated_count} | Novos: {new_count} | Sem alteracao: {unchanged_count} | Valor preservado: {preserved_count} | Sem preco lido: {missing_count}")
+
+    report_rows = []
+    for item in report:
+        row = dict(item)
+        for field in ("Valor antigo", "Valor novo"):
+            value = row[field]
+            row[field] = "Consulte o valor" if value is None else f"R$ {float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        report_rows.append(row)
+
+    report_df = pd.DataFrame(report_rows)
+    with st.expander("Ver detalhes dos valores", expanded=updated_count > 0):
+        st.dataframe(report_df, use_container_width=True, hide_index=True)
+        st.download_button("Baixar relatorio CSV", report_df.to_csv(index=False).encode("utf-8-sig"), "relatorio_importacao_catalogo.csv", "text/csv", key="download_catalog_import_report")
+
 def buscar_catalogo_publico(supabase, category=None):
     query = supabase.table("singelo_catalogo_instagram").select("*").eq("active", True).order("category").order("title")
     if category and category != "Todas":
@@ -1462,25 +1488,6 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
                     st.warning("Os produtos foram cadastrados pelos links. Ajuste titulo, valor, categoria e descricao em Revisao e valores.")
                 report = save_result.get("report", []) if save_result else []
                 st.session_state.catalog_import_report = report
-                if report:
-                    updated_count = sum(1 for item in report if item["Situacao"] == "Valor atualizado")
-                    new_count = sum(1 for item in report if item["Situacao"] == "Novo")
-                    preserved_count = sum(1 for item in report if item["Situacao"] == "Nao lido - valor preservado")
-                    unchanged_count = sum(1 for item in report if item["Situacao"] == "Sem alteracao")
-                    missing_count = sum(1 for item in report if item["Situacao"] == "Sem preco lido")
-                    st.markdown("#### Relatorio da importacao")
-                    st.info(f"Atualizados: {updated_count} | Novos: {new_count} | Sem alteracao: {unchanged_count} | Valor preservado: {preserved_count} | Sem preco lido: {missing_count}")
-                    report_rows = []
-                    for item in report:
-                        row = dict(item)
-                        for field in ("Valor antigo", "Valor novo"):
-                            value = row[field]
-                            row[field] = "Consulte o valor" if value is None else f"R$ {float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                        report_rows.append(row)
-                    report_df = pd.DataFrame(report_rows)
-                    with st.expander("Ver detalhes dos valores", expanded=updated_count > 0):
-                        st.dataframe(report_df, use_container_width=True, hide_index=True)
-                        st.download_button("Baixar relatorio CSV", report_df.to_csv(index=False).encode("utf-8-sig"), "relatorio_importacao_catalogo.csv", "text/csv", key="download_catalog_import_report")
             except Exception as exc:
                 st.error(f"Nao foi possivel importar e salvar: {exc}")
                 if "42501" in str(exc) or "row-level security" in str(exc).lower():
@@ -1495,6 +1502,7 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
     if not products:
         st.info("Cole os links no painel lateral para iniciar.")
         return
+    render_relatorio_importacao_catalogo(st.session_state.get("catalog_import_report", []))
     st.markdown("### Produtos salvos")
     st.write(f"{len(products)} produto(s) disponivel(is) no catalogo.")
     public_base = st.text_input("Endereco publicado do catalogo", "https://www.singelogesto.com.br/catalogo/", key="catalog_public_base")
