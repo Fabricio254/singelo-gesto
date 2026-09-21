@@ -1305,6 +1305,23 @@ def salvar_edicao_catalogo(supabase, product_id, data):
     return supabase.table("singelo_catalogo_instagram").update(data).eq("id", product_id).execute()
 
 
+def salvar_fotos_catalogo(supabase, product_id, uploaded_files):
+    """Envia fotos revisadas para o Storage e retorna URLs publicas permanentes."""
+    urls = []
+    for index, uploaded in enumerate(uploaded_files or []):
+        extension = (uploaded.name.rsplit(".", 1)[-1] if "." in uploaded.name else "jpg").lower()
+        if extension not in {"jpg", "jpeg", "png", "webp"}:
+            extension = "jpg"
+        path = f"produtos/{product_id}/{int(datetime.now().timestamp())}-{index}.{extension}"
+        supabase.storage.from_("catalogo-imagens").upload(
+            path=path,
+            file=uploaded.getvalue(),
+            file_options={"content-type": uploaded.type or "image/jpeg", "upsert": "true"},
+        )
+        urls.append(supabase.storage.from_("catalogo-imagens").get_public_url(path))
+    return urls
+
+
 def render_catalogo_publico(supabase):
     """Pagina publica de vendas, acessada por link compartilhavel."""
     try:
@@ -1577,17 +1594,29 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
                         key=f"{form_key}_price",
                     )
                     description = st.text_area("Descricao", value=product.get("description", ""), height=120, key=f"{form_key}_description")
+                    uploaded_images = st.file_uploader(
+                        "Substituir fotos (ate 4)",
+                        type=["jpg", "jpeg", "png", "webp"],
+                        accept_multiple_files=True,
+                        key=f"{form_key}_images",
+                        help="As fotos ficam armazenadas permanentemente no Supabase e substituem os links temporarios do Instagram.",
+                    )
                     active = st.checkbox("Mostrar no catalogo publico", value=bool(product.get("active", True)), key=f"{form_key}_active")
                     salvar = st.form_submit_button("Salvar alteracoes", type="primary", use_container_width=True)
                 if salvar:
                     try:
-                        salvar_edicao_catalogo(supabase, product.get("id"), {
+                        update_data = {
                             "title": title.strip() or "Produto",
                             "category": category.strip() or "Outros",
                             "description": description,
                             "price": price,
                             "active": active,
-                        })
+                        }
+                        if uploaded_images:
+                            permanent_urls = salvar_fotos_catalogo(supabase, product.get("id"), uploaded_images[:4])
+                            update_data["image_url"] = permanent_urls[0]
+                            update_data["image_urls"] = permanent_urls
+                        salvar_edicao_catalogo(supabase, product.get("id"), update_data)
                         st.success("Produto atualizado.")
                         st.rerun()
                     except Exception as exc:

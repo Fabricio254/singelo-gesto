@@ -94,8 +94,10 @@ def fallback_product_from_link(link: str, username: str = "singelo_gesto", error
         "description": "",
         "price": None,
         "prices_found": [],
-        "image_url": f"https://www.instagram.com/p/{shortcode}/media/?size=l" if shortcode else None,
-        "image_urls": [f"https://www.instagram.com/p/{shortcode}/media/?size=l"] if shortcode else [],
+        # This Instagram endpoint is not a stable image URL. Leave the photo
+        # empty so the previous permanent image is preserved during imports.
+        "image_url": None,
+        "image_urls": [],
         "permalink": permalink,
         "taken_at": None,
         "_import_error": error,
