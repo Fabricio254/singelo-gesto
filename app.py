@@ -1387,6 +1387,97 @@ def verificar_fotos_catalogo(products):
     return report
 
 
+def migrar_fotos_catalogo(supabase, products, progress_callback=None):
+    """Atualiza fotos do Instagram e as copia para o Storage permanente."""
+    links = [product.get("permalink") for product in products if product.get("permalink")]
+    if not links:
+        return []
+
+    def normalized_link(value):
+        match = re.search(r"instagram\.com/(?:p|reel|tv)/([A-Za-z0-9_-]+)", value or "", re.IGNORECASE)
+        return match.group(1).lower() if match else (value or "").split("?", 1)[0].rstrip("/").lower()
+
+    refreshed = collect_post_links("\n".join(links))
+    refreshed_by_link = {
+        normalized_link(item.get("permalink")): item
+        for item in refreshed
+        if item.get("permalink")
+    }
+    results = []
+    total = len(products)
+    for index, product in enumerate(products, start=1):
+        title = product.get("title") or "Produto"
+        if progress_callback:
+            progress_callback(index, total, title)
+        fresh = refreshed_by_link.get(normalized_link(product.get("permalink")), {})
+        source_urls = []
+        if isinstance(fresh.get("image_urls"), list):
+            source_urls.extend(url for url in fresh["image_urls"] if url)
+        if fresh.get("image_url") and fresh["image_url"] not in source_urls:
+            source_urls.insert(0, fresh["image_url"])
+        source_urls = list(dict.fromkeys(source_urls))[:4]
+        if not source_urls:
+            results.append({
+                "ID": product.get("id"),
+                "Produto": title,
+                "Situacao": "Nao foi possivel ler o Instagram",
+                "Fotos": 0,
+            })
+            continue
+
+        permanent_urls = []
+        error_message = ""
+        for photo_index, source_url in enumerate(source_urls):
+            try:
+                response = requests.get(
+                    source_url,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=20,
+                )
+                response.raise_for_status()
+                content_type = (response.headers.get("content-type") or "image/jpeg").split(";", 1)[0].lower()
+                if not content_type.startswith("image/"):
+                    raise ValueError("O endereco nao retornou uma imagem")
+                extension = {
+                    "image/jpeg": "jpg",
+                    "image/png": "png",
+                    "image/webp": "webp",
+                }.get(content_type, "jpg")
+                path = (
+                    f"produtos/{product.get('id')}/"
+                    f"instagram-{int(datetime.now().timestamp())}-{photo_index}.{extension}"
+                )
+                supabase.storage.from_("catalogo-imagens").upload(
+                    path=path,
+                    file=response.content,
+                    file_options={"content-type": content_type, "upsert": "true"},
+                )
+                permanent_urls.append(
+                    supabase.storage.from_("catalogo-imagens").get_public_url(path)
+                )
+            except Exception as exc:
+                error_message = str(exc)
+        if permanent_urls:
+            salvar_edicao_catalogo(supabase, product.get("id"), {
+                "image_url": permanent_urls[0],
+                "image_urls": permanent_urls,
+            })
+            results.append({
+                "ID": product.get("id"),
+                "Produto": title,
+                "Situacao": "Migrado",
+                "Fotos": len(permanent_urls),
+            })
+        else:
+            results.append({
+                "ID": product.get("id"),
+                "Produto": title,
+                "Situacao": f"Falha ao copiar: {error_message[:120]}",
+                "Fotos": 0,
+            })
+    return results
+
+
 def render_catalogo_publico(supabase):
     """Pagina publica de vendas, acessada por link compartilhavel."""
     try:
@@ -1657,6 +1748,62 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
                 if image_report.get(product.get("id"), {}).get("situacao") != "OK"
             ]
             st.write(f"{len(products_to_show)} produto(s) precisam de revisao das fotos.")
+            migration_candidates = [
+                product for product in products_to_show if product.get("permalink")
+            ]
+            batch_size = st.selectbox(
+                "Produtos por lote de migracao",
+                options=[5, 10, 20],
+                index=1,
+                help="Lotes menores reduzem a chance de bloqueio temporario do Instagram.",
+            )
+            if st.button(
+                "Migrar proximo lote para fotos permanentes",
+                type="primary",
+                use_container_width=True,
+                disabled=not migration_candidates,
+            ):
+                selected_batch = migration_candidates[:batch_size]
+                progress = st.progress(0, text="Preparando migracao...")
+
+                def update_migration_progress(current, total, title):
+                    progress.progress(
+                        current / total,
+                        text=f"Migrando {current} de {total}: {title[:70]}",
+                    )
+
+                try:
+                    migration_result = migrar_fotos_catalogo(
+                        supabase,
+                        selected_batch,
+                        update_migration_progress,
+                    )
+                    st.session_state.catalog_migration_report = migration_result
+                    migrated_ids = {
+                        item["ID"] for item in migration_result
+                        if item["Situacao"] == "Migrado"
+                    }
+                    for product in selected_batch:
+                        if product.get("id") in migrated_ids:
+                            image_report[product.get("id")] = {
+                                "situacao": "OK",
+                                "validas": 1,
+                                "quebradas": 0,
+                            }
+                    st.session_state.catalog_image_report = image_report
+                    progress.progress(1.0, text="Lote concluido.")
+                    st.rerun()
+                except Exception as exc:
+                    progress.empty()
+                    st.error(f"Nao foi possivel concluir o lote: {exc}")
+    migration_report = st.session_state.get("catalog_migration_report", [])
+    if migration_report:
+        migrated_count = sum(1 for item in migration_report if item["Situacao"] == "Migrado")
+        st.success(
+            f"Ultimo lote: {migrated_count} de {len(migration_report)} produto(s) migrado(s)."
+        )
+        with st.expander("Ver relatorio do ultimo lote"):
+            st.dataframe(pd.DataFrame(migration_report), use_container_width=True, hide_index=True)
     for index, product in enumerate(products_to_show):
         image_status = image_report.get(product.get("id"), {})
         status_label = image_status.get("situacao")
