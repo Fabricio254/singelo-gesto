@@ -6,6 +6,7 @@ from PIL import Image
 import xml.etree.ElementTree as ET
 import requests
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from Instagram import collect_post_links, collect_post_links_manual, product_message, whatsapp_url
 from urllib.parse import quote
 
@@ -1322,6 +1323,70 @@ def salvar_fotos_catalogo(supabase, product_id, uploaded_files):
     return urls
 
 
+def verificar_url_imagem(url):
+    """Confirma se uma URL publica responde com conteudo de imagem."""
+    try:
+        response = requests.get(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Singelo Gesto catalog image check)",
+                "Range": "bytes=0-1023",
+            },
+            timeout=8,
+            allow_redirects=True,
+            stream=True,
+        )
+        content_type = (response.headers.get("content-type") or "").lower()
+        valid = response.status_code < 400 and content_type.startswith("image/")
+        return valid, response.status_code
+    except requests.RequestException:
+        return False, None
+    finally:
+        try:
+            response.close()
+        except (NameError, AttributeError):
+            pass
+
+
+def verificar_fotos_catalogo(products):
+    """Testa em paralelo todas as fotos e classifica os produtos afetados."""
+    def inspect(product):
+        urls = []
+        if isinstance(product.get("image_urls"), list):
+            urls.extend(url for url in product["image_urls"] if url)
+        if product.get("image_url") and product["image_url"] not in urls:
+            urls.insert(0, product["image_url"])
+        urls = list(dict.fromkeys(urls))[:4]
+        if not urls:
+            return product.get("id"), {
+                "situacao": "Sem foto",
+                "validas": 0,
+                "quebradas": 0,
+            }
+        results = [verificar_url_imagem(url) for url in urls]
+        valid_count = sum(1 for valid, _ in results if valid)
+        broken_count = len(results) - valid_count
+        if broken_count == 0:
+            situation = "OK"
+        elif valid_count:
+            situation = "Algumas fotos quebradas"
+        else:
+            situation = "Todas as fotos quebradas"
+        return product.get("id"), {
+            "situacao": situation,
+            "validas": valid_count,
+            "quebradas": broken_count,
+        }
+
+    report = {}
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        futures = [executor.submit(inspect, product) for product in products]
+        for future in as_completed(futures):
+            product_id, result = future.result()
+            report[product_id] = result
+    return report
+
+
 def render_catalogo_publico(supabase):
     """Pagina publica de vendas, acessada por link compartilhavel."""
     try:
@@ -1566,8 +1631,39 @@ https://www.instagram.com/p/DKsMTMTPnbq/?stkn=d3h4Z3l5dHVtNmwx"""
         st.caption(f"Catalogo de {category}")
     st.markdown("### Revisao e valores")
     st.caption("A categoria escolhida aqui define em qual link publico o produto aparece.")
-    for index, product in enumerate(products):
-        with st.expander(f"{product.get('title', 'Produto')} | {product.get('category', 'Outros')}"):
+    if st.button("Verificar fotos de todos os produtos", type="secondary", use_container_width=True):
+        with st.spinner("Testando as fotos dos produtos..."):
+            st.session_state.catalog_image_report = verificar_fotos_catalogo(products)
+    image_report = st.session_state.get("catalog_image_report", {})
+    products_to_show = products
+    if image_report:
+        ok_count = sum(1 for item in image_report.values() if item["situacao"] == "OK")
+        partial_count = sum(1 for item in image_report.values() if item["situacao"] == "Algumas fotos quebradas")
+        broken_count = sum(1 for item in image_report.values() if item["situacao"] == "Todas as fotos quebradas")
+        empty_count = sum(1 for item in image_report.values() if item["situacao"] == "Sem foto")
+        st.info(
+            f"Verificacao concluida: {ok_count} produto(s) OK, "
+            f"{partial_count} com algumas fotos quebradas, "
+            f"{broken_count} com todas quebradas e {empty_count} sem foto."
+        )
+        only_affected = st.checkbox(
+            "Mostrar somente produtos com fotos quebradas ou ausentes",
+            value=True,
+            key="catalog_only_broken_images",
+        )
+        if only_affected:
+            products_to_show = [
+                product for product in products
+                if image_report.get(product.get("id"), {}).get("situacao") != "OK"
+            ]
+            st.write(f"{len(products_to_show)} produto(s) precisam de revisao das fotos.")
+    for index, product in enumerate(products_to_show):
+        image_status = image_report.get(product.get("id"), {})
+        status_label = image_status.get("situacao")
+        expander_title = f"{product.get('title', 'Produto')} | {product.get('category', 'Outros')}"
+        if status_label:
+            expander_title += f" | {status_label}"
+        with st.expander(expander_title):
             col_image, col_data = st.columns([1, 2])
             with col_image:
                 if product.get("image_url"):
